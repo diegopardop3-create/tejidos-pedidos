@@ -479,8 +479,9 @@ function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, s
       <div className="g3" style={{ marginBottom: 14 }}>
         {tipos.map((t) => (
           <div className="fld" key={t}>
-            <label>{TIPO_ICON[t]} Precio {TIPO_LABEL[t]} ($/u)</label>
-            <input type="number" step="0.01" min="0" placeholder="0.00" value={precios[t] || ''} onChange={(e) => setPrecios((p) => ({ ...p, [t]: e.target.value }))} />
+            <label>{TIPO_ICON[t]} Precio {TIPO_LABEL[t]} (pesos, sin puntos)</label>
+            <input type="number" step="1" min="0" placeholder="Ej: 1700" value={precios[t] || ''} onChange={(e) => setPrecios((p) => ({ ...p, [t]: e.target.value }))} />
+            {precios[t] > 0 && <span style={{ fontSize: 11, color: 'var(--thread)', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>= {fmtCOP(precios[t])}</span>}
           </div>
         ))}
         <div className="fld full">
@@ -578,8 +579,9 @@ function FormularioChaq({ tipos, rows, cants, diseno, precios, imgs, setDiseno, 
       <div className="g3" style={{ marginBottom: 14 }}>
         {tipos.map((t) => (
           <div className="fld" key={t}>
-            <label>{TIPO_ICON[t]} Precio {TIPO_LABEL[t]} ($/kg)</label>
-            <input type="number" step="0.01" min="0" placeholder="0.00" value={precios[t] || ''} onChange={(e) => setPrecios((p) => ({ ...p, [t]: e.target.value }))} />
+            <label>{TIPO_ICON[t]} Precio {TIPO_LABEL[t]} por kilo (pesos, sin puntos)</label>
+            <input type="number" step="1" min="0" placeholder="Ej: 12000" value={precios[t] || ''} onChange={(e) => setPrecios((p) => ({ ...p, [t]: e.target.value }))} />
+            {precios[t] > 0 && <span style={{ fontSize: 11, color: 'var(--jtx)', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>= {fmtCOP(precios[t])}/kg</span>}
           </div>
         ))}
         <div className="fld full">
