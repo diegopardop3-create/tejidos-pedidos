@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
+import logo from '../assets/logo.png'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -22,21 +23,7 @@ export default function Login() {
     <div style={styles.wrap}>
       <div style={styles.card}>
         <div style={styles.brand}>
-          <div style={styles.iconGrid}>
-            {Array.from({ length: 9 }).map((_, i) => (
-              <span
-                key={i}
-                style={{
-                  ...styles.iconDot,
-                  background: i % 2 === 0 ? '#40916c' : '#b7e4c7',
-                }}
-              />
-            ))}
-          </div>
-          <div>
-            <div style={styles.brandTitle}>Tejidos y Confecciones</div>
-            <div style={styles.brandSub}>LAURA LIZETH</div>
-          </div>
+          <img src={logo} alt="L&L" style={styles.logoImg} />
         </div>
 
         <h1 style={styles.heading}>Iniciar sesión</h1>
@@ -89,63 +76,49 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: '#f5f7f5',
+    background: '#f5f2e7',
     fontFamily: "'Inter', sans-serif",
     padding: 16,
   },
   card: {
-    background: '#fff',
-    border: '1px solid #d0e8d8',
+    background: '#fffdf8',
+    border: '1px solid #dde3d2',
     borderRadius: 16,
     padding: 36,
     width: '100%',
     maxWidth: 400,
-    boxShadow: '0 8px 30px rgba(26,26,46,0.08)',
+    boxShadow: '0 8px 30px rgba(26,60,99,0.10)',
   },
   brand: {
     display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 28,
+    justifyContent: 'center',
+    marginBottom: 18,
   },
-  iconGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: 2,
-    width: 28,
-    height: 28,
-    flexShrink: 0,
+  logoImg: {
+    height: 110,
+    objectFit: 'contain',
   },
-  iconDot: { display: 'block', borderRadius: 1 },
-  brandTitle: { fontSize: 14, fontWeight: 700, color: '#1a1a2e', lineHeight: 1.2 },
-  brandSub: {
-    fontSize: 10,
-    fontWeight: 600,
-    color: '#2d6a4f',
-    letterSpacing: '0.08em',
-    fontFamily: "'DM Mono', monospace",
-  },
-  heading: { fontSize: 22, fontWeight: 800, color: '#1a1a2e', marginBottom: 6 },
-  subheading: { fontSize: 13, color: '#6b7c6e', marginBottom: 24, lineHeight: 1.5 },
+  heading: { fontSize: 22, fontWeight: 800, color: '#1a3c63', marginBottom: 6, textAlign: 'center', fontFamily: "'Playfair Display', serif" },
+  subheading: { fontSize: 13, color: '#6a7d5a', marginBottom: 24, lineHeight: 1.5, textAlign: 'center' },
   form: { display: 'flex', flexDirection: 'column', gap: 16 },
   field: { display: 'flex', flexDirection: 'column', gap: 6 },
   label: {
     fontSize: 11,
     fontWeight: 700,
-    color: '#6b7c6e',
+    color: '#6a7d5a',
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
     fontFamily: "'DM Mono', monospace",
   },
   input: {
     padding: '11px 14px',
-    border: '1px solid #d0e8d8',
+    border: '1px solid #dde3d2',
     borderRadius: 9,
     fontSize: 14,
     fontFamily: "'Inter', sans-serif",
-    background: '#f5f7f5',
+    background: '#f5f2e7',
     outline: 'none',
-    color: '#1a1a2e',
+    color: '#1a3c63',
   },
   error: {
     background: '#fdf2f2',
@@ -158,7 +131,7 @@ const styles = {
   button: {
     marginTop: 6,
     padding: '12px 18px',
-    background: '#2d6a4f',
+    background: '#4b8523',
     color: '#fff',
     border: 'none',
     borderRadius: 9,
@@ -169,7 +142,7 @@ const styles = {
   footnote: {
     marginTop: 22,
     fontSize: 12,
-    color: '#6b7c6e',
+    color: '#6a7d5a',
     textAlign: 'center',
     lineHeight: 1.5,
   },

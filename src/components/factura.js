@@ -1,4 +1,5 @@
-import { NEGOCIO, TIPO_LABEL, fmtFecha } from './constants'
+import { NEGOCIO, TIPO_LABEL, fmtFecha, fmtCOP } from './constants'
+import logoUrl from './../assets/logo.png'
 
 // Genera la factura como HTML imprimible y abre el diálogo de impresión/guardar como PDF.
 // Esto evita depender de librerías pesadas de generación de PDF en el navegador.
@@ -13,16 +14,16 @@ export function generarFacturaPDF(pedido) {
         <td>${tLabel} (Camiseta)</td>
         <td>${it.diseno || '—'}</td>
         <td style="text-align:center">${it.total_unidades}</td>
-        <td style="text-align:right">$${(it.total_precio / (it.total_unidades || 1)).toFixed(2)}</td>
-        <td style="text-align:right">$${it.total_precio.toFixed(2)}</td>
+        <td style="text-align:right">${fmtCOP(it.total_precio / (it.total_unidades || 1))}</td>
+        <td style="text-align:right">${fmtCOP(it.total_precio)}</td>
       </tr>`
   }).join('')
 
   const filasChaq = itemsChaq.map((it) => {
     const tLabel = it.tipos.map((t) => TIPO_LABEL[t]).join(' + ')
-    const precioStr = it.tipos.map((t) => `${TIPO_LABEL[t]}: $${it.precios[t]}/kg`).join(', ')
+    const precioStr = it.tipos.map((t) => `${TIPO_LABEL[t]}: ${fmtCOP(it.precios[t])}/kg`).join(', ')
     const totalStr = it.kilos_reales
-      ? `$${it.total_final.toFixed(2)}`
+      ? fmtCOP(it.total_final)
       : 'Pendiente de pesaje'
     return `
       <tr>
@@ -49,38 +50,43 @@ export function generarFacturaPDF(pedido) {
       <style>
         @page { size: A4; margin: 18mm; }
         * { box-sizing: border-box; }
-        body { font-family: Arial, Helvetica, sans-serif; color: #1a1a2e; font-size: 13px; line-height: 1.5; }
-        .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #2d6a4f; padding-bottom: 16px; margin-bottom: 20px; }
-        .negocio h1 { font-size: 20px; margin: 0 0 4px; color: #1a1a2e; }
-        .negocio p { margin: 1px 0; font-size: 12px; color: #555; }
+        body { font-family: 'Georgia', 'Times New Roman', serif; color: #1a3c63; font-size: 13px; line-height: 1.5; }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #4b8523; padding-bottom: 16px; margin-bottom: 20px; }
+        .negocio { display: flex; align-items: center; gap: 14px; }
+        .negocio img { height: 56px; }
+        .negocio h1 { font-size: 19px; margin: 0 0 4px; color: #1a3c63; font-family: 'Georgia', serif; }
+        .negocio p { margin: 1px 0; font-size: 12px; color: #6a7d5a; font-family: Arial, sans-serif; }
         .doc-info { text-align: right; }
-        .doc-info .titulo { font-size: 15px; font-weight: bold; color: #2d6a4f; margin-bottom: 4px; }
-        .doc-info .numero { font-size: 22px; font-weight: bold; color: #1a1a2e; font-family: monospace; }
-        .doc-info .fecha { font-size: 12px; color: #555; margin-top: 4px; }
-        .cliente-box { background: #f5f7f5; border-radius: 8px; padding: 14px 18px; margin-bottom: 22px; }
-        .cliente-box .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7c6e; margin-bottom: 4px; }
-        .cliente-box .nombre { font-size: 16px; font-weight: bold; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-        th { background: #1a1a2e; color: #b7e4c7; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 9px 10px; text-align: left; }
+        .doc-info .titulo { font-size: 14px; font-weight: bold; color: #4b8523; margin-bottom: 4px; font-family: Arial, sans-serif; letter-spacing: 0.04em; }
+        .doc-info .numero { font-size: 22px; font-weight: bold; color: #1a3c63; font-family: 'Courier New', monospace; }
+        .doc-info .fecha { font-size: 12px; color: #6a7d5a; margin-top: 4px; font-family: Arial, sans-serif; }
+        .cliente-box { background: #f1f6ec; border-radius: 8px; padding: 14px 18px; margin-bottom: 22px; }
+        .cliente-box .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #6a7d5a; margin-bottom: 4px; font-family: Arial, sans-serif; }
+        .cliente-box .nombre { font-size: 16px; font-weight: bold; color: #1a3c63; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-family: Arial, sans-serif; }
+        th { background: #1a3c63; color: #a8c98a; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 9px 10px; text-align: left; }
         td { padding: 9px 10px; border-bottom: 1px solid #e0e0e0; font-size: 12px; }
-        tbody tr:nth-child(even) { background: #fafafa; }
+        tbody tr:nth-child(even) { background: #faf8f2; }
         .totales { display: flex; justify-content: flex-end; margin-top: 10px; }
-        .totales-box { width: 280px; }
+        .totales-box { width: 280px; font-family: Arial, sans-serif; }
         .totales-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; }
-        .totales-row.final { border-top: 2px solid #1a1a2e; margin-top: 6px; padding-top: 10px; font-size: 17px; font-weight: bold; color: #2d6a4f; }
-        .nota-pendiente { background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #795548; margin-top: 14px; }
-        .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e0e0e0; font-size: 11px; color: #888; text-align: center; }
-        .estado-badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: bold; background: #e8f5e9; color: #2d6a4f; margin-top: 6px; }
+        .totales-row.final { border-top: 2px solid #1a3c63; margin-top: 6px; padding-top: 10px; font-size: 17px; font-weight: bold; color: #4b8523; }
+        .nota-pendiente { background: #fdf8ee; border: 1px solid #e0bd72; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #8a5a16; margin-top: 14px; font-family: Arial, sans-serif; }
+        .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e0e0e0; font-size: 11px; color: #888; text-align: center; font-family: Arial, sans-serif; }
+        .estado-badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: bold; background: #f1f6ec; color: #4b8523; margin-top: 6px; font-family: Arial, sans-serif; }
         @media print { .no-print { display: none; } }
       </style>
     </head>
     <body>
       <div class="header">
         <div class="negocio">
-          <h1>${NEGOCIO.nombre}</h1>
-          ${NEGOCIO.nit ? `<p>NIT/Cédula: ${NEGOCIO.nit}</p>` : ''}
-          ${NEGOCIO.direccion ? `<p>${NEGOCIO.direccion}</p>` : ''}
-          ${NEGOCIO.telefono ? `<p>Tel: ${NEGOCIO.telefono}</p>` : ''}
+          <img src="${logoUrl}" alt="Logo" onerror="this.style.display='none'">
+          <div>
+            <h1>${NEGOCIO.nombre}</h1>
+            ${NEGOCIO.nit ? `<p>NIT/Cédula: ${NEGOCIO.nit}</p>` : ''}
+            ${NEGOCIO.direccion ? `<p>${NEGOCIO.direccion}</p>` : ''}
+            ${NEGOCIO.telefono ? `<p>Tel: ${NEGOCIO.telefono}</p>` : ''}
+          </div>
         </div>
         <div class="doc-info">
           <div class="titulo">COMPROBANTE DE COBRO</div>
@@ -106,9 +112,9 @@ export function generarFacturaPDF(pedido) {
 
       <div class="totales">
         <div class="totales-box">
-          <div class="totales-row"><span>Subtotal Camiseta</span><span>$${totalCam.toFixed(2)}</span></div>
-          ${itemsChaq.length ? `<div class="totales-row"><span>Subtotal Chaqueta</span><span>${hayPendiente ? 'Pendiente de pesaje' : '$' + totalChaq.toFixed(2)}</span></div>` : ''}
-          <div class="totales-row final"><span>TOTAL A PAGAR</span><span>${hayPendiente ? '$' + totalCam.toFixed(2) + ' + pesaje' : '$' + totalGeneral.toFixed(2)}</span></div>
+          <div class="totales-row"><span>Subtotal Camiseta</span><span>${fmtCOP(totalCam)}</span></div>
+          ${itemsChaq.length ? `<div class="totales-row"><span>Subtotal Chaqueta</span><span>${hayPendiente ? 'Pendiente de pesaje' : fmtCOP(totalChaq)}</span></div>` : ''}
+          <div class="totales-row final"><span>TOTAL A PAGAR</span><span>${hayPendiente ? fmtCOP(totalCam) + ' + pesaje' : fmtCOP(totalGeneral)}</span></div>
         </div>
       </div>
 

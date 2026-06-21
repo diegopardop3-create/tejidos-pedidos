@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
-import { TALLAS, TIPO_LABEL, TIPO_ICON, hoy } from './constants'
+import { TALLAS, TIPO_LABEL, TIPO_ICON, hoy, ESTADOS, ESTADO_ICON, fmtCOP } from './constants'
 
 const TIPOS_CAM = ['puno', 'cuello']
 const TIPOS_CHAQ = ['pretina', 'cuello', 'puno']
@@ -269,9 +269,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
         <div className="fld">
           <label>Estado</label>
           <select value={estado} onChange={(e) => setEstado(e.target.value)}>
-            <option value="Pendiente">⏳ Pendiente</option>
-            <option value="En proceso">🔄 En proceso</option>
-            <option value="Entregado">✅ Entregado</option>
+            {ESTADOS.map((es) => <option key={es} value={es}>{ESTADO_ICON[es]} {es}</option>)}
           </select>
         </div>
         <div className="fld"><label>Observaciones</label><input value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Notas generales..." /></div>
@@ -364,7 +362,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
         <div className="total-bar">
           <span className="tb-lbl">Total del Pedido</span>
           <span className="tb-val">
-            ${totalCam.toFixed(2)}
+            {fmtCOP(totalCam)}
             {tempChaq.length > 0 && <span className="tb-sub">+ chaqueta (pendiente de pesaje)</span>}
           </span>
         </div>
@@ -396,8 +394,8 @@ function ItemCardCam({ it, onDelete }) {
           {it.diseno && <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 400 }}>{it.diseno}</span>}
         </div>
         <div className="iblk-meta">
-          <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: "'DM Mono', monospace" }}>{it.total_unidades}u · ${it.total_precio.toFixed(2)}</span>
-          <span className="itot">${it.total_precio.toFixed(2)}</span>
+          <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: "'DM Mono', monospace" }}>{it.total_unidades}u · {fmtCOP(it.total_precio)}</span>
+          <span className="itot">{fmtCOP(it.total_precio)}</span>
           <button className="btn btn-d btn-sm" onClick={onDelete}>✕</button>
         </div>
       </div>
@@ -442,7 +440,7 @@ function ItemCardChaq({ it, onDelete }) {
         </div>
         <div className="iblk-meta">
           <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: "'DM Mono', monospace" }}>
-            {it.tipos.map((t) => `${TIPO_LABEL[t]}: $${it.precios[t]}/kg`).join(' · ')}
+            {it.tipos.map((t) => `${TIPO_LABEL[t]}: ${fmtCOP(it.precios[t])}/kg`).join(' · ')}
           </span>
           <span className="itot pend">⚖️ Pendiente</span>
           <button className="btn btn-d btn-sm" onClick={onDelete}>✕</button>

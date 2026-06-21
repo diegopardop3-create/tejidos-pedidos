@@ -2,11 +2,17 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import Login from './components/Login'
 import Pedidos from './components/Pedidos'
+import VistaPublica from './components/VistaPublica'
 
 export default function App() {
   const [session, setSession] = useState(undefined) // undefined = cargando
 
+  // Detecta si la URL trae ?pedido=TOKEN -> vista pública, sin login
+  const params = new URLSearchParams(window.location.search)
+  const tokenPublico = params.get('pedido')
+
   useEffect(() => {
+    if (tokenPublico) return // no necesitamos sesión para la vista pública
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
     })
@@ -16,7 +22,11 @@ export default function App() {
     })
 
     return () => listener.subscription.unsubscribe()
-  }, [])
+  }, [tokenPublico])
+
+  if (tokenPublico) {
+    return <VistaPublica token={tokenPublico} />
+  }
 
   if (session === undefined) {
     return (

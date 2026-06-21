@@ -6,11 +6,15 @@ export const MESES = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ]
 
+export const ESTADOS = ['Pendiente', 'En proceso', 'Listo', 'Entregado']
+export const ESTADO_ICON = { 'Pendiente': '⏳', 'En proceso': '🔄', 'Listo': '📦', 'Entregado': '✅' }
+export const ESTADO_DOT = { 'Pendiente': 'dot-p', 'En proceso': 'dot-e', 'Listo': 'dot-l', 'Entregado': 'dot-d' }
+
 export const NEGOCIO = {
   nombre: 'Tejidos y Confecciones Laura Lizeth',
-  nit: '', // Edita aquí tu NIT/cédula
-  direccion: '', // Edita aquí tu dirección
-  telefono: '', // Edita aquí tu teléfono
+  nit: '80.262.959-2',
+  direccion: 'Carrera 73H No. 58A-06 Sur',
+  telefono: '313 282 1596',
 }
 
 export function hoy() {
@@ -21,6 +25,13 @@ export function fmtFecha(f) {
   if (!f) return '—'
   const [y, m, d] = f.split('-')
   return `${d}/${m}/${y}`
+}
+
+// Formatea números como pesos colombianos: 1700 -> "$1.700"
+// Los pesos colombianos no usan decimales en el uso cotidiano.
+export function fmtCOP(valor) {
+  const n = Math.round(valor || 0)
+  return '$' + n.toLocaleString('es-CO')
 }
 
 export function calcProgreso(pedido) {

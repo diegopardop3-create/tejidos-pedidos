@@ -4,7 +4,7 @@ import NuevoPedido from './NuevoPedido'
 import ListaPedidos from './ListaPedidos'
 import Resumen from './Resumen'
 import DetalleModal from './DetalleModal'
-import { TIPO_LABEL } from './constants'
+import logo from '../assets/logo.png'
 import './styles.css'
 
 export default function Pedidos({ session }) {
@@ -40,6 +40,16 @@ export default function Pedidos({ session }) {
     cargarPedidos()
   }, [cargarPedidos])
 
+  async function handleCompartir(pedido) {
+    const url = `${window.location.origin}${window.location.pathname}?pedido=${pedido.token_publico}`
+    try {
+      await navigator.clipboard.writeText(url)
+      showToast('🔗', 'Enlace copiado — ya lo puedes enviar al cliente')
+    } catch {
+      prompt('Copia este enlace para enviarlo al cliente:', url)
+    }
+  }
+
   async function handleLogout() {
     await supabase.auth.signOut()
   }
@@ -51,11 +61,7 @@ export default function Pedidos({ session }) {
     <div className="app-root">
       <header className="hdr">
         <div className="hbrand">
-          <div className="hico">
-            {Array.from({ length: 9 }).map((_, i) => (
-              <span key={i} />
-            ))}
-          </div>
+          <img src={logo} alt="L&L Tejidos y Confecciones" className="hlogo" />
           <div>
             <div className="htitle">Tejidos y Confecciones Laura Lizeth</div>
             <div className="hsub">GESTIÓN DE PRODUCCIÓN</div>
@@ -105,6 +111,8 @@ export default function Pedidos({ session }) {
             pedidos={pedidos}
             loading={loading}
             onVerDetalle={(idx) => setDetalleIdx(idx)}
+            onCompartir={handleCompartir}
+            refrescar={cargarPedidos}
             onEliminar={async (pedido) => {
               if (!confirm(`¿Eliminar pedido ${pedido.numero}?`)) return
               const { error } = await supabase.from('pedidos').delete().eq('id', pedido.id)
@@ -124,6 +132,7 @@ export default function Pedidos({ session }) {
           pedido={pedidos[detalleIdx]}
           onClose={() => setDetalleIdx(null)}
           onUpdated={cargarPedidos}
+          onCompartir={handleCompartir}
           onEditar={() => {
             setEditPedido(pedidos[detalleIdx])
             setDetalleIdx(null)

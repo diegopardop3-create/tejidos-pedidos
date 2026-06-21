@@ -1,17 +1,23 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { TIPO_LABEL, TIPO_ICON, fmtFecha, calcProgreso } from './constants'
+import { TIPO_LABEL, TIPO_ICON, fmtFecha, fmtCOP, calcProgreso, ESTADOS, ESTADO_ICON } from './constants'
 import { generarFacturaPDF } from './factura'
 
-export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, showToast }) {
+export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onCompartir, showToast }) {
   const [lightbox, setLightbox] = useState(null)
   if (!pedido) return null
 
-  const dotC = { Pendiente: 'dot-p', 'En proceso': 'dot-e', Entregado: 'dot-d' }
   const pr = calcProgreso(pedido)
   const pedidoCompleto = pedido.estado === 'Entregado' ||
     (pr.total > 0 && pr.ok === pr.total) ||
     (pr.total === 0 && (pedido.items_chaqueta || []).every((it) => it.kilos_reales != null))
+
+  async function cambiarEstado(nuevoEstado) {
+    const { error } = await supabase.from('pedidos').update({ estado: nuevoEstado, actualizado_en: new Date().toISOString() }).eq('id', pedido.id)
+    if (error) { showToast('⚠️', 'Error al cambiar estado'); return }
+    showToast(ESTADO_ICON[nuevoEstado], `Estado actualizado a ${nuevoEstado}`)
+    onUpdated()
+  }
 
   async function toggleCelda(itemTabla, itemId, ek, nuevoEstado) {
     const estados = { ...(itemTabla.estados || {}) }
@@ -56,7 +62,11 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, sho
             <div className="dp"><span className="dk">N° Pedido</span><span className="dv" style={{ fontFamily: "'DM Mono', monospace", fontSize: 17, fontWeight: 800, color: 'var(--thread)' }}>{pedido.numero}</span></div>
             <div className="dp"><span className="dk">Fecha</span><span className="dv">{fmtFecha(pedido.fecha)}</span></div>
             <div className="dp"><span className="dk">Cliente</span><span className="dv">{pedido.cliente}</span></div>
-            <div className="dp"><span className="dk">Estado</span><span className="dv"><span className="edot"><span className={`dot ${dotC[pedido.estado] || 'dot-p'}`} />{pedido.estado}</span></span></div>
+            <div className="dp"><span className="dk">Estado</span><span className="dv">
+              <select className="estado-select" value={pedido.estado} onChange={(e) => cambiarEstado(e.target.value)}>
+                {ESTADOS.map((es) => <option key={es} value={es}>{ESTADO_ICON[es]} {es}</option>)}
+              </select>
+            </span></div>
             {pedido.observaciones && <div className="dp" style={{ gridColumn: '1/-1' }}><span className="dk">Observaciones</span><span className="dv">{pedido.observaciones}</span></div>}
           </div>
         </div>
@@ -97,6 +107,7 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, sho
 
         <div className="brow right">
           <button className="btn btn-s" onClick={onClose}>Cerrar</button>
+          <button className="btn btn-s" onClick={() => onCompartir(pedido)}>🔗 Compartir con cliente</button>
           {pedidoCompleto && (
             <button className="btn btn-s" onClick={() => generarFacturaPDF(pedido)} style={{ background: 'var(--weave)', color: 'var(--thread)', fontWeight: 700 }}>
               🧾 Descargar Factura
@@ -130,7 +141,7 @@ function ItemCamView({ it, onToggle, onImgClick }) {
           <span className="badge cam">{tLabel}</span>
           {it.diseno && <span style={{ fontSize: 12, color: 'var(--muted)' }}>{it.diseno}</span>}
         </div>
-        <span className="itot">${it.total_precio.toFixed(2)}</span>
+        <span className="itot">{fmtCOP(it.total_precio)}</span>
       </div>
 
       <div className="tscroll cam-scroll">
@@ -182,7 +193,7 @@ function ItemCamView({ it, onToggle, onImgClick }) {
       )}
 
       <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, fontFamily: "'DM Mono', monospace" }}>
-        {it.tipos.map((t) => `${TIPO_LABEL[t]}: $${(it.precios[t] || 0).toFixed(2)}/u`).join(' · ')}
+        {it.tipos.map((t) => `${TIPO_LABEL[t]}: ${fmtCOP(it.precios[t] || 0)}/u`).join(' · ')}
       </div>
     </div>
   )
@@ -200,7 +211,7 @@ function ItemChaqView({ it, estadoPedido, onToggle, onPesaje, onImgClick }) {
           <span className="badge chaq">{tLabel}</span>
           {it.diseno && <span style={{ fontSize: 12, color: 'var(--muted)' }}>{it.diseno}</span>}
         </div>
-        <span className={`itot ${it.kilos_reales ? '' : 'pend'}`}>{it.kilos_reales ? `✅ $${it.total_final.toFixed(2)}` : '⚖️ Pendiente de pesaje'}</span>
+        <span className={`itot ${it.kilos_reales ? '' : 'pend'}`}>{it.kilos_reales ? `✅ ${fmtCOP(it.total_final)}` : '⚖️ Pendiente de pesaje'}</span>
       </div>
 
       <div className="tscroll chaq-scroll">
@@ -241,7 +252,7 @@ function ItemChaqView({ it, estadoPedido, onToggle, onPesaje, onImgClick }) {
       )}
 
       <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, fontFamily: "'DM Mono', monospace" }}>
-        {it.tipos.map((t) => `${TIPO_LABEL[t]}: $${(it.precios[t] || 0).toFixed(2)}/kg`).join(' · ')} · {it.total_unidades} piezas
+        {it.tipos.map((t) => `${TIPO_LABEL[t]}: ${fmtCOP(it.precios[t] || 0)}/kg`).join(' · ')} · {it.total_unidades} piezas
       </div>
 
       {estadoPedido !== 'Entregado' ? (
@@ -250,12 +261,12 @@ function ItemChaqView({ it, estadoPedido, onToggle, onPesaje, onImgClick }) {
           <div className="prow">
             <label>Kilos reales:</label>
             <input type="number" step="0.01" min="0" value={kg} onChange={(e) => setKg(e.target.value)} placeholder="0.00" />
-            <span className="ptot">{kg ? `$${(parseFloat(kg) * p0).toFixed(2)}` : ''}</span>
+            <span className="ptot">{kg ? fmtCOP(parseFloat(kg) * p0) : ''}</span>
             <button className="btn btn-p btn-sm" onClick={() => onPesaje(it, kg)}>Guardar</button>
           </div>
         </div>
       ) : it.kilos_reales ? (
-        <div style={{ fontSize: 12, color: 'var(--thread)', marginTop: 6, fontWeight: 600 }}>✅ {it.kilos_reales} kg · ${it.total_final.toFixed(2)}</div>
+        <div style={{ fontSize: 12, color: 'var(--thread)', marginTop: 6, fontWeight: 600 }}>✅ {it.kilos_reales} kg · {fmtCOP(it.total_final)}</div>
       ) : null}
     </div>
   )

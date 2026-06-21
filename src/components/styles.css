@@ -1,28 +1,33 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700;800&display=swap');
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --ink:#1a1a2e; --thread:#2d6a4f; --thread2:#40916c;
-  --yarn:#b7e4c7; --loom:#f5f7f5; --weave:#e8f5e9;
-  --border:#d0e8d8; --muted:#6b7c6e; --white:#fff;
-  --danger:#c0392b; --warn:#e67e22; --pending:#f0a500; --done:#2d6a4f;
-  --cbg:#f3fbf5; --cbd:#90cca0; --ctx:#1b5e20;
-  --jbg:#fffaf3; --jbd:#f0c080; --jtx:#9a5000;
+  /* Paleta extraída directamente del logo L&L Tejidos y Confecciones */
+  --ink:#1a3c63;        /* azul marino del logo (L & L) */
+  --thread:#4b8523;     /* verde tejido del logo */
+  --thread2:#5e9c34;    /* variante más clara del verde para hover */
+  --yarn:#a8c98a;       /* verde suave para acentos sobre fondo oscuro */
+  --loom:#f5f2e7;       /* crema/hueso, fondo general (igual al logo) */
+  --weave:#eef3e6;      /* verde muy claro para fondos de tarjetas */
+  --border:#dde3d2;     /* borde suave a tono con el crema */
+  --muted:#6a7d5a;      /* verde grisáceo del subtítulo del logo */
+  --white:#fffdf8;
+  --danger:#c0392b; --warn:#e67e22; --pending:#f0a500; --done:#4b8523;
+  --cbg:#f1f6ec; --cbd:#a8c98a; --ctx:#3d6b1c;
+  --jbg:#fdf8ee; --jbd:#e0bd72; --jtx:#8a5a16;
+  --font-display: 'Playfair Display', Georgia, serif;
 }
 
 body { font-family: 'Inter', sans-serif; background: var(--loom); color: var(--ink); }
 .app-root { min-height: 100vh; }
 
 /* HEADER */
-.hdr { background: var(--ink); min-height: 54px; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; flex-wrap: wrap; gap: 10px; }
-.hbrand { display: flex; align-items: center; gap: 10px; }
-.hico { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; width: 22px; height: 22px; }
-.hico span { display: block; border-radius: 1px; }
-.hico span:nth-child(odd) { background: var(--thread2); }
-.hico span:nth-child(even) { background: var(--yarn); }
-.htitle { font-size: 13px; font-weight: 700; color: #fff; }
-.hsub { font-size: 10px; color: var(--yarn); font-family: 'DM Mono', monospace; letter-spacing: .06em; }
+.hdr { background: var(--ink); min-height: 58px; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; flex-wrap: wrap; gap: 10px; }
+.hbrand { display: flex; align-items: center; gap: 12px; }
+.hlogo { height: 40px; width: 40px; object-fit: contain; border-radius: 8px; background: var(--loom); padding: 3px; }
+.htitle { font-size: 15px; font-weight: 700; color: #fff; font-family: var(--font-display); letter-spacing: .02em; }
+.hsub { font-size: 9px; color: var(--yarn); font-family: 'DM Mono', monospace; letter-spacing: .1em; }
 .hstats { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
 .hst { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--yarn); display: flex; align-items: center; gap: 4px; }
 .hst strong { color: #fff; font-size: 15px; }
@@ -40,8 +45,8 @@ body { font-family: 'Inter', sans-serif; background: var(--loom); color: var(--i
 
 /* CARD */
 .card { background: var(--white); border: 1px solid var(--border); border-radius: 12px; padding: 22px; margin-bottom: 16px; }
-.ctitle { font-size: 14px; font-weight: 700; margin-bottom: 18px; display: flex; align-items: center; gap: 8px; }
-.ctitle::before { content: ''; display: block; width: 3px; height: 15px; background: var(--thread); border-radius: 2px; }
+.ctitle { font-size: 16px; font-weight: 700; margin-bottom: 18px; display: flex; align-items: center; gap: 8px; font-family: var(--font-display); color: var(--ink); }
+.ctitle::before { content: ''; display: block; width: 3px; height: 16px; background: var(--thread); border-radius: 2px; }
 
 /* FIELDS */
 .fld { display: flex; flex-direction: column; gap: 4px; }
@@ -210,9 +215,13 @@ tbody td { padding: 10px 13px; vertical-align: middle; }
 .td-p { font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 600; color: var(--thread); }
 .td-p.warn { color: var(--warn); }
 .edot { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; }
+.estado-select { font-size: 12px; font-weight: 600; padding: 5px 8px; border-radius: 7px; border: 1px solid var(--border); background: var(--loom); color: var(--ink); cursor: pointer; font-family: 'Inter', sans-serif; outline: none; }
+.estado-select:hover { background: var(--weave); border-color: var(--thread2); }
+.estado-select:focus { border-color: var(--thread); }
 .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .dot-p { background: var(--pending); }
 .dot-e { background: var(--warn); }
+.dot-l { background: #4a90d9; }
 .dot-d { background: var(--done); }
 .empty { text-align: center; padding: 50px 20px; color: var(--muted); }
 .empty-ico { font-size: 36px; margin-bottom: 10px; opacity: .4; }
