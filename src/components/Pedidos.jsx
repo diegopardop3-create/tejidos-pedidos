@@ -83,7 +83,10 @@ export default function Pedidos({ session }) {
             ＋ Nuevo Pedido
           </button>
           <button className={`tab ${tab === 'lista' ? 'on' : ''}`} onClick={() => setTab('lista')}>
-            📋 Pedidos
+            📋 Activos
+          </button>
+          <button className={`tab ${tab === 'entregados' ? 'on' : ''}`} onClick={() => setTab('entregados')}>
+            ✅ Entregados
           </button>
           <button className={`tab ${tab === 'resumen' ? 'on' : ''}`} onClick={() => setTab('resumen')}>
             📊 Resumen
@@ -108,9 +111,12 @@ export default function Pedidos({ session }) {
 
         {tab === 'lista' && (
           <ListaPedidos
-            pedidos={pedidos}
+            pedidos={pedidos.filter(p => p.estado !== 'Entregado')}
             loading={loading}
-            onVerDetalle={(idx) => setDetalleIdx(idx)}
+            onVerDetalle={(idx) => {
+              const p = pedidos.filter(p => p.estado !== 'Entregado')[idx]
+              setDetalleIdx(pedidos.indexOf(p))
+            }}
             onCompartir={handleCompartir}
             refrescar={cargarPedidos}
             onEliminar={async (pedido) => {
@@ -121,6 +127,30 @@ export default function Pedidos({ session }) {
               cargarPedidos()
             }}
             showToast={showToast}
+            titulo="Pedidos Activos"
+          />
+        )}
+
+        {tab === 'entregados' && (
+          <ListaPedidos
+            pedidos={pedidos.filter(p => p.estado === 'Entregado')}
+            loading={loading}
+            onVerDetalle={(idx) => {
+              const p = pedidos.filter(p => p.estado === 'Entregado')[idx]
+              setDetalleIdx(pedidos.indexOf(p))
+            }}
+            onCompartir={handleCompartir}
+            refrescar={cargarPedidos}
+            onEliminar={async (pedido) => {
+              if (!confirm(`¿Eliminar pedido ${pedido.numero}?`)) return
+              const { error } = await supabase.from('pedidos').delete().eq('id', pedido.id)
+              if (error) { showToast('⚠️', 'Error al eliminar'); return }
+              showToast('🗑️', 'Pedido eliminado')
+              cargarPedidos()
+            }}
+            showToast={showToast}
+            titulo="Pedidos Entregados"
+            soloEntregados
           />
         )}
 

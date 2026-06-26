@@ -10,6 +10,10 @@ export const ESTADOS = ['Pendiente', 'En proceso', 'Listo', 'Entregado']
 export const ESTADO_ICON = { 'Pendiente': '⏳', 'En proceso': '🔄', 'Listo': '📦', 'Entregado': '✅' }
 export const ESTADO_DOT = { 'Pendiente': 'dot-p', 'En proceso': 'dot-e', 'Listo': 'dot-l', 'Entregado': 'dot-d' }
 
+export const ESTADOS_PAGO = ['Pendiente', 'Parcial', 'Pagado']
+export const PAGO_ICON = { 'Pendiente': '💳', 'Parcial': '💰', 'Pagado': '✅' }
+export const PAGO_COLOR = { 'Pendiente': '#e67e22', 'Parcial': '#f0a500', 'Pagado': '#4b8523' }
+
 export const NEGOCIO = {
   nombre: 'Tejidos y Confecciones Laura Lizeth',
   nit: '80.262.959-2',

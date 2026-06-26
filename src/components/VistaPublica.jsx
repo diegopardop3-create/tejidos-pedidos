@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { TIPO_LABEL, TIPO_ICON, fmtFecha, fmtCOP, calcProgreso, ESTADO_ICON } from './constants'
+import { TIPO_LABEL, fmtFecha, fmtCOP, calcProgreso, ESTADO_ICON, PAGO_COLOR, PAGO_ICON } from './constants'
 import logo from '../assets/logo.png'
 
 // Vista pública de un pedido: se accede por enlace con token, sin necesidad
 // de iniciar sesión. Solo lectura — el cliente ve el estado de su pedido.
 export default function VistaPublica({ token }) {
-  const [pedido, setPedido] = useState(undefined) // undefined = cargando, null = no encontrado
+  const [pedido, setPedido] = useState(undefined)
+  const [abonos, setAbonos] = useState([])
 
   useEffect(() => {
     async function cargar() {
@@ -17,6 +18,13 @@ export default function VistaPublica({ token }) {
         .maybeSingle()
       if (error || !data) { setPedido(null); return }
       setPedido(data)
+      // Cargar abonos
+      const { data: abonosData } = await supabase
+        .from('abonos')
+        .select('*')
+        .eq('pedido_id', data.id)
+        .order('fecha', { ascending: false })
+      setAbonos(abonosData || [])
     }
     cargar()
   }, [token])
@@ -41,6 +49,12 @@ export default function VistaPublica({ token }) {
   const hayChaq = (pedido.items_chaqueta || []).length > 0
   const totChaqFinal = (pedido.items_chaqueta || []).reduce((s, it) => s + (it.total_final || 0), 0)
   const pendientePesaje = (pedido.items_chaqueta || []).some((it) => !it.kilos_reales)
+  const totalPedido = pendientePesaje ? totalCam : totalCam + totChaqFinal
+  const totalAbonado = abonos.reduce((s, a) => s + (a.monto || 0), 0)
+  const saldoPendiente = Math.max(0, totalPedido - totalAbonado)
+  const estadoPago = pedido.estado_pago || 'Pendiente'
+  const colorPago = PAGO_COLOR[estadoPago]
+  const pctPago = totalPedido > 0 ? Math.min(100, Math.round((totalAbonado / totalPedido) * 100)) : 0
 
   return (
     <div style={styles.wrap}>
@@ -94,6 +108,48 @@ export default function VistaPublica({ token }) {
             {pendientePesaje ? `${fmtCOP(totalCam)} + pesaje` : fmtCOP(totalCam + totChaqFinal)}
           </span>
         </div>
+
+        {/* Estado de pago */}
+        {totalPedido > 0 && (
+          <div style={{ marginTop: 16, border: `1px solid ${colorPago}30`, borderRadius: 10, overflow: 'hidden' }}>
+            <div style={{ background: `${colorPago}12`, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: colorPago }}>
+                {estadoPago === 'Pagado' ? '✅ Pagado completamente' : estadoPago === 'Parcial' ? '💰 Pago parcial' : '💳 Pendiente de pago'}
+              </span>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, fontWeight: 700, color: colorPago }}>{pctPago}%</span>
+            </div>
+            {estadoPago !== 'Pagado' && (
+              <div style={{ padding: '12px 16px', textAlign: 'left' }}>
+                {totalAbonado > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+                    <span style={{ color: '#6a7d5a' }}>Total abonado</span>
+                    <span style={{ fontWeight: 700, color: '#4b8523', fontFamily: "'DM Mono', monospace" }}>{fmtCOP(totalAbonado)}</span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                  <span style={{ color: '#6a7d5a' }}>Saldo pendiente</span>
+                  <span style={{ fontWeight: 800, color: colorPago, fontFamily: "'DM Mono', monospace", fontSize: 15 }}>{fmtCOP(saldoPendiente)}</span>
+                </div>
+                {/* Barra de progreso de pago */}
+                <div style={{ background: '#e0e0e0', borderRadius: 20, height: 6, marginTop: 10, overflow: 'hidden' }}>
+                  <div style={{ width: `${pctPago}%`, height: '100%', background: colorPago, borderRadius: 20 }} />
+                </div>
+              </div>
+            )}
+            {/* Historial de abonos */}
+            {abonos.length > 0 && (
+              <div style={{ padding: '0 16px 12px', borderTop: `1px solid ${colorPago}20` }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#6a7d5a', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '.06em', margin: '10px 0 6px' }}>Historial de pagos</div>
+                {abonos.map(a => (
+                  <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px dotted #eee', fontSize: 12 }}>
+                    <span>{fmtFecha(a.fecha)}{a.nota ? ` — ${a.nota}` : ''}</span>
+                    <span style={{ fontWeight: 700, color: '#4b8523', fontFamily: "'DM Mono', monospace" }}>{fmtCOP(a.monto)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {pedido.observaciones && (
           <div style={{ marginTop: 16, fontSize: 13, color: '#444' }}>

@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { TIPO_LABEL, TIPO_ICON, fmtFecha, fmtCOP, calcProgreso, ESTADOS, ESTADO_ICON } from './constants'
+import { TIPO_LABEL, TIPO_ICON, fmtFecha, fmtCOP, calcProgreso, ESTADOS, ESTADO_ICON, fmtCOP as _f } from './constants'
 import { generarFacturaPDF } from './factura'
+import PanelPagos from './PanelPagos'
 
 export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onCompartir, showToast }) {
   const [lightbox, setLightbox] = useState(null)
@@ -114,6 +115,17 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
             </button>
           )}
           <button className="btn btn-p" onClick={onEditar}>✏️ Editar</button>
+        </div>
+
+        {/* Panel de pagos */}
+        <div className="msec" style={{ marginTop: 8 }}>
+          <h4>💳 Pagos y Abonos</h4>
+          <PanelPagos
+            pedido={pedido}
+            onUpdated={onUpdated}
+            showToast={showToast}
+            compact={false}
+          />
         </div>
       </div>
 
