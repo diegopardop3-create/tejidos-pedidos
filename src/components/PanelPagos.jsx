@@ -11,7 +11,12 @@ export default function PanelPagos({ pedido, onUpdated, showToast, compact = fal
   const [guardando, setGuardando] = useState(false)
   const [expandido, setExpandido] = useState(!compact)
 
-  const totalPedido = pedido.total_final || pedido.total_camiseta || 0
+  // Total real = camiseta + chaqueta ya pesada (no depende de total_final del pedido
+  // que puede estar desactualizado si hay_chaqueta sigue en true)
+  const totCam = pedido.total_camiseta || 0
+  const itemsChaq = pedido.items_chaqueta || []
+  const totChaqPesada = itemsChaq.reduce((s, it) => s + (it.total_final || 0), 0)
+  const totalPedido = totCam + totChaqPesada
 
   useEffect(() => {
     cargarAbonos()

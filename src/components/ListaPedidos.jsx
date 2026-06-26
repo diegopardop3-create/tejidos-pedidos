@@ -101,11 +101,19 @@ export default function ListaPedidos({ pedidos, loading, onVerDetalle, onElimina
                 const tipsCam = [...new Set((p.items_camiseta || []).flatMap((it) => it.tipos || []))].map((t) => TIPO_ICON[t] + TIPO_LABEL[t])
                 const tipsChaq = [...new Set((p.items_chaqueta || []).flatMap((it) => it.tipos || []))].map((t) => TIPO_ICON[t] + TIPO_LABEL[t])
                 const ni = (p.items_camiseta || []).length + (p.items_chaqueta || []).length
-                const totStr = p.hay_chaqueta && !p.total_camiseta
-                  ? <span className="td-p warn">⚖️ Por pesar</span>
-                  : p.hay_chaqueta
-                  ? <><span className="td-p">{fmtCOP(p.total_camiseta)}</span><span style={{ fontSize: 10, color: 'var(--warn)', marginLeft: 4 }}>+⚖️</span></>
-                  : <span className="td-p">{fmtCOP(p.total_camiseta)}</span>
+                // Calcular total real: camiseta + chaqueta pesada
+                const totCam = p.total_camiseta || 0
+                const itemsChaq = p.items_chaqueta || []
+                const todosChaqPesados = itemsChaq.length > 0 && itemsChaq.every(it => it.kilos_reales != null)
+                const algunChaqPendiente = itemsChaq.some(it => it.kilos_reales == null)
+                const totChaqPesada = itemsChaq.reduce((s, it) => s + (it.total_final || 0), 0)
+                const totalReal = totCam + totChaqPesada
+
+                const totStr = itemsChaq.length === 0
+                  ? <span className="td-p">{fmtCOP(totCam)}</span>
+                  : algunChaqPendiente
+                  ? <><span className="td-p">{fmtCOP(totalReal)}</span><span style={{ fontSize: 10, color: 'var(--warn)', marginLeft: 4 }}>+⚖️</span></>
+                  : <span className="td-p">{fmtCOP(totalReal)}</span>
                 const pr = calcProgreso(p)
                 const estadoPago = p.estado_pago || 'Pendiente'
                 const colorPago = PAGO_COLOR[estadoPago]
