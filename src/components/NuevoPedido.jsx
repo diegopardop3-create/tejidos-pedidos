@@ -26,6 +26,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
   const [camDiseno, setCamDiseno] = useState('')
   const [camPrecios, setCamPrecios] = useState({})
   const [camImgs, setCamImgs] = useState([])
+  const [camEsJuego, setCamEsJuego] = useState(false)
 
   const [chaqRows, setChaqRows] = useState([''])
   const [chaqCants, setChaqCants] = useState({})
@@ -53,7 +54,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
   }, [editPedido, pedidos])
 
   function resetItemForms() {
-    setCamSelTipos(new Set()); setCamCols(['']); setCamCants({}); setCamDiseno(''); setCamPrecios({}); setCamImgs([])
+    setCamSelTipos(new Set()); setCamCols(['']); setCamCants({}); setCamDiseno(''); setCamPrecios({}); setCamImgs([]); setCamEsJuego(false)
     setChaqSelTipos(new Set()); setChaqRows(['']); setChaqCants({}); setChaqDiseno(''); setChaqPrecios({}); setChaqImgs([])
   }
 
@@ -160,13 +161,21 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
       if (Object.keys(tallaObj).length) tabla[talla] = tallaObj
     })
     if (!totalU) { showToast('⚠️', 'Ingresa al menos una cantidad'); return }
+    const esJuego = camEsJuego && tipos.length === 2 && tipos.includes('puno') && tipos.includes('cuello')
     const precios = {}
-    tipos.forEach((t) => { precios[t] = parseFloat(camPrecios[t]) || 0 })
+    if (esJuego) {
+      const pj = parseFloat(camPrecios.juego) || 0
+      // El mismo precio aplica a cada tipo
+      tipos.forEach((t) => { precios[t] = pj })
+      precios.juego = pj
+    } else {
+      tipos.forEach((t) => { precios[t] = parseFloat(camPrecios[t]) || 0 })
+    }
     const totalPrecio = tipos.reduce((s, t) => {
       const uT = Object.values(tabla).reduce((s2, tallaObj) => s2 + Object.values(tallaObj).reduce((s3, colObj) => s3 + (colObj[t] || 0), 0), 0)
       return s + uT * precios[t]
     }, 0)
-    setTempCam((prev) => [...prev, { tipos, precios, diseno: camDiseno, imagenes: camImgs, tabla, total_unidades: totalU, total_precio: totalPrecio, estados: {} }])
+    setTempCam((prev) => [...prev, { tipos, precios, es_juego: esJuego, diseno: camDiseno, imagenes: camImgs, tabla, total_unidades: totalU, total_precio: totalPrecio, estados: {} }])
     resetItemForms()
     showToast('✅', 'Ítem añadido al pedido')
   }
@@ -305,6 +314,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
               setDiseno={setCamDiseno} setPrecios={setCamPrecios}
               setV={camSetV} addCol={camAddCol} delCol={camDelCol}
               setCols={setCamCols}
+              esJuego={camEsJuego} setEsJuego={setCamEsJuego}
               onImgs={(e) => handleImgs(e, 'cam')}
               onDelImg={(i) => setCamImgs((p) => p.filter((_, idx) => idx !== i))}
               onCancel={resetItemForms}
@@ -391,6 +401,7 @@ function ItemCardCam({ it, onDelete }) {
       <div className="iblk-hdr">
         <div className="iblk-label">
           <span className="badge cam">{tLabel} — Camiseta</span>
+          {(it.es_juego || it.precios?.juego) && <span className="badge cam" style={{ background: '#4b8523', color: '#fff' }}>🎽 Juego {fmtCOP(it.precios.juego || 0)} c/u</span>}
           {it.diseno && <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 400 }}>{it.diseno}</span>}
         </div>
         <div className="iblk-meta">
@@ -472,18 +483,38 @@ function ItemCardChaq({ it, onDelete }) {
   )
 }
 
-function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, setPrecios, setV, addCol, delCol, setCols, onImgs, onDelImg, onCancel, onSave }) {
+function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, setPrecios, setV, addCol, delCol, setCols, onImgs, onDelImg, onCancel, onSave, esJuego, setEsJuego }) {
+  const puedeSerJuego = tipos.length === 2 && tipos.includes('puno') && tipos.includes('cuello')
   return (
     <div className="add-form">
       <div className="af-title">Nuevo ítem — {tipos.map((t) => `${TIPO_ICON[t]} ${TIPO_LABEL[t]}`).join(' + ')}</div>
-      <div className="g3" style={{ marginBottom: 14 }}>
-        {tipos.map((t) => (
-          <div className="fld" key={t}>
-            <label>{TIPO_ICON[t]} Precio {TIPO_LABEL[t]} (pesos, sin puntos)</label>
-            <input type="number" step="1" min="0" placeholder="Ej: 1700" value={precios[t] || ''} onChange={(e) => setPrecios((p) => ({ ...p, [t]: e.target.value }))} />
-            {precios[t] > 0 && <span style={{ fontSize: 11, color: 'var(--thread)', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>= {fmtCOP(precios[t])}</span>}
+
+      {puedeSerJuego && (
+        <div style={{ background: '#eef3e6', border: '1px solid #a8c98a', borderRadius: 9, padding: '10px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => setEsJuego(v => !v)}>
+          <span style={{ width: 20, height: 20, borderRadius: 5, border: '2px solid #4b8523', background: esJuego ? '#4b8523' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, flexShrink: 0 }}>{esJuego ? '✓' : ''}</span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#3d6b1c' }}>Cobrar como juego (precio único)</div>
+            <div style={{ fontSize: 11, color: '#6a7d5a' }}>Un solo precio que aplica igual a cada cuello y cada puño, según su cantidad.</div>
           </div>
-        ))}
+        </div>
+      )}
+
+      <div className="g3" style={{ marginBottom: 14 }}>
+        {esJuego && puedeSerJuego ? (
+          <div className="fld">
+            <label>🎽 Precio del juego (pesos, sin puntos)</label>
+            <input type="number" step="1" min="0" placeholder="Ej: 2600" value={precios.juego || ''} onChange={(e) => setPrecios((p) => ({ ...p, juego: e.target.value }))} />
+            {precios.juego > 0 && <span style={{ fontSize: 11, color: 'var(--thread)', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>= {fmtCOP(precios.juego)} c/pieza</span>}
+          </div>
+        ) : (
+          tipos.map((t) => (
+            <div className="fld" key={t}>
+              <label>{TIPO_ICON[t]} Precio {TIPO_LABEL[t]} (pesos, sin puntos)</label>
+              <input type="number" step="1" min="0" placeholder="Ej: 1700" value={precios[t] || ''} onChange={(e) => setPrecios((p) => ({ ...p, [t]: e.target.value }))} />
+              {precios[t] > 0 && <span style={{ fontSize: 11, color: 'var(--thread)', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>= {fmtCOP(precios[t])}</span>}
+            </div>
+          ))
+        )}
         <div className="fld full">
           <label>Descripción / Diseño</label>
           <textarea value={diseno} onChange={(e) => setDiseno(e.target.value)} placeholder="Referencia del cliente, tipo de tejido, características..." />

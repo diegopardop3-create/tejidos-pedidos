@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient'
 import NuevoPedido from './NuevoPedido'
 import ListaPedidos from './ListaPedidos'
 import Resumen from './Resumen'
+import ListaPrecios from './ListaPrecios'
 import DetalleModal from './DetalleModal'
 import logo from '../assets/logo.png'
 import './styles.css'
@@ -91,6 +92,9 @@ export default function Pedidos({ session }) {
           <button className={`tab ${tab === 'resumen' ? 'on' : ''}`} onClick={() => setTab('resumen')}>
             📊 Resumen
           </button>
+          <button className={`tab ${tab === 'precios' ? 'on' : ''}`} onClick={() => setTab('precios')}>
+            🏷️ Precios
+          </button>
         </div>
 
         {tab === 'nuevo' && (
@@ -155,6 +159,8 @@ export default function Pedidos({ session }) {
         )}
 
         {tab === 'resumen' && <Resumen pedidos={pedidos} />}
+
+        {tab === 'precios' && <ListaPrecios showToast={showToast} />}
       </div>
 
       {detalleIdx !== null && (

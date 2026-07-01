@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { TIPO_LABEL, TIPO_ICON, fmtFecha, fmtCOP, calcProgreso, ESTADOS, ESTADO_ICON, ESTADO_DOT, PAGO_COLOR, PAGO_ICON } from './constants'
+import { imprimirEtiqueta } from './factura'
 import PanelPagos from './PanelPagos'
 
 export default function ListaPedidos({ pedidos, loading, onVerDetalle, onEliminar, onCompartir, showToast, refrescar, titulo = 'Pedidos', soloEntregados = false }) {
@@ -167,6 +168,7 @@ export default function ListaPedidos({ pedidos, loading, onVerDetalle, onElimina
                       </td>
                       <td onClick={(e) => e.stopPropagation()}>
                         <div style={{ display: 'flex', gap: 5 }}>
+                          <button className="btn btn-s btn-sm" title="Imprimir etiqueta" onClick={() => imprimirEtiqueta(p)}>🏷️</button>
                           <button className="btn btn-s btn-sm" title="Compartir" onClick={() => onCompartir(p)}>🔗</button>
                           <button className="btn btn-d btn-sm" onClick={() => onEliminar(p)}>🗑</button>
                         </div>

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { TIPO_LABEL, TIPO_ICON, fmtFecha, fmtCOP, calcProgreso, ESTADOS, ESTADO_ICON, fmtCOP as _f } from './constants'
-import { generarFacturaPDF } from './factura'
+import { generarFacturaPDF, imprimirEtiqueta } from './factura'
 import PanelPagos from './PanelPagos'
 
 export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onCompartir, showToast }) {
@@ -108,6 +108,7 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
 
         <div className="brow right">
           <button className="btn btn-s" onClick={onClose}>Cerrar</button>
+          <button className="btn btn-s" onClick={() => imprimirEtiqueta(pedido)}>🏷️ Etiqueta</button>
           <button className="btn btn-s" onClick={() => onCompartir(pedido)}>🔗 Compartir con cliente</button>
           {pedidoCompleto && (
             <button className="btn btn-s" onClick={() => generarFacturaPDF(pedido)} style={{ background: 'var(--weave)', color: 'var(--thread)', fontWeight: 700 }}>
@@ -151,6 +152,7 @@ function ItemCamView({ it, onToggle, onImgClick }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span className="badge cam">{tLabel}</span>
+          {it.precios?.juego && <span className="badge cam" style={{ background: '#4b8523', color: '#fff' }}>🎽 Juego {fmtCOP(it.precios.juego)} c/u</span>}
           {it.diseno && <span style={{ fontSize: 12, color: 'var(--muted)' }}>{it.diseno}</span>}
         </div>
         <span className="itot">{fmtCOP(it.total_precio)}</span>
@@ -205,7 +207,9 @@ function ItemCamView({ it, onToggle, onImgClick }) {
       )}
 
       <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, fontFamily: "'DM Mono', monospace" }}>
-        {it.tipos.map((t) => `${TIPO_LABEL[t]}: ${fmtCOP(it.precios[t] || 0)}/u`).join(' · ')}
+        {it.precios?.juego
+          ? `Juego (cuello + puño): ${fmtCOP(it.precios.juego)} por pieza`
+          : it.tipos.map((t) => `${TIPO_LABEL[t]}: ${fmtCOP(it.precios[t] || 0)}/u`).join(' · ')}
       </div>
     </div>
   )

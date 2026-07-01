@@ -135,3 +135,56 @@ export function generarFacturaPDF(pedido) {
   win.document.close()
   setTimeout(() => win.print(), 400)
 }
+
+// Genera una etiqueta pequeña (2" x 1" — 51mm x 25mm) lista para imprimir
+// en impresoras térmicas de etiquetas tipo Jadens, tanto desde PC como
+// desde el navegador del celular (usa el diálogo de impresión del sistema).
+export function imprimirEtiqueta(pedido) {
+  const win = window.open('', '_blank')
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Etiqueta ${pedido.numero}</title>
+  <style>
+    @page { size: 51mm 25mm; margin: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: #ddd; }
+    .hoja {
+      width: 51mm; height: 25mm;
+      font-family: Arial, Helvetica, sans-serif;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 1.5mm 2.5mm;
+      background: #fff;
+      margin: 8mm auto;
+      box-shadow: 0 2px 10px rgba(0,0,0,.15);
+    }
+    .marca { font-size: 5pt; letter-spacing: 0.12em; color: #6a7d5a; text-transform: uppercase; margin-bottom: 1mm; font-weight: 600; }
+    .linea { width: 100%; border-top: 0.3mm solid #4b8523; margin-bottom: 1mm; }
+    .numero { font-size: 18pt; font-weight: 900; color: #1a3c63; letter-spacing: 0.02em; line-height: 1; margin-bottom: 1mm; }
+    .cliente { font-size: 7pt; font-weight: 700; color: #1a3c63; text-align: center; line-height: 1.2; max-width: 46mm; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .no-print { text-align: center; margin-top: 14px; }
+    .no-print button {
+      background: #4b8523; color: #fff; border: none; padding: 12px 28px;
+      border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer;
+    }
+    .no-print p { font-size: 12px; color: #666; margin-top: 10px; padding: 0 20px; }
+    @media print {
+      html, body { background: #fff; }
+      .hoja { margin: 0; box-shadow: none; }
+      .no-print { display: none; }
+    }
+  </style>
+  </head><body>
+    <div class="hoja">
+      <div class="marca">L &amp; L · Tejidos y Confecciones</div>
+      <div class="linea"></div>
+      <div class="numero">${pedido.numero}</div>
+      <div class="cliente">${pedido.cliente}</div>
+    </div>
+    <div class="no-print">
+      <button onclick="window.print()">🖨 Imprimir etiqueta</button>
+      <p>Selecciona tu impresora Jadens en el diálogo de impresión. Si el tamaño no coincide, verifica que el papel esté configurado en 51×25mm.</p>
+    </div>
+  </body></html>`)
+  win.document.close()
+}
