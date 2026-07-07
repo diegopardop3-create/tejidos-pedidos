@@ -27,12 +27,14 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
   const [camPrecios, setCamPrecios] = useState({})
   const [camImgs, setCamImgs] = useState([])
   const [camEsJuego, setCamEsJuego] = useState(false)
+  const [camEditIdx, setCamEditIdx] = useState(null) // idx en tempCam que se está editando, o null si es nuevo
 
   const [chaqRows, setChaqRows] = useState([''])
   const [chaqCants, setChaqCants] = useState({})
   const [chaqDiseno, setChaqDiseno] = useState('')
   const [chaqPrecios, setChaqPrecios] = useState({})
   const [chaqImgs, setChaqImgs] = useState([])
+  const [chaqEditIdx, setChaqEditIdx] = useState(null)
 
   const [saving, setSaving] = useState(false)
 
@@ -54,8 +56,8 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
   }, [editPedido, pedidos])
 
   function resetItemForms() {
-    setCamSelTipos(new Set()); setCamCols(['']); setCamCants({}); setCamDiseno(''); setCamPrecios({}); setCamImgs([]); setCamEsJuego(false)
-    setChaqSelTipos(new Set()); setChaqRows(['']); setChaqCants({}); setChaqDiseno(''); setChaqPrecios({}); setChaqImgs([])
+    setCamSelTipos(new Set()); setCamCols(['']); setCamCants({}); setCamDiseno(''); setCamPrecios({}); setCamImgs([]); setCamEsJuego(false); setCamEditIdx(null)
+    setChaqSelTipos(new Set()); setChaqRows(['']); setChaqCants({}); setChaqDiseno(''); setChaqPrecios({}); setChaqImgs([]); setChaqEditIdx(null)
   }
 
   function limpiarTodo() {
@@ -175,9 +177,53 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
       const uT = Object.values(tabla).reduce((s2, tallaObj) => s2 + Object.values(tallaObj).reduce((s3, colObj) => s3 + (colObj[t] || 0), 0), 0)
       return s + uT * precios[t]
     }, 0)
-    setTempCam((prev) => [...prev, { tipos, precios, es_juego: esJuego, diseno: camDiseno, imagenes: camImgs, tabla, total_unidades: totalU, total_precio: totalPrecio, estados: {} }])
+    // Guardamos el orden exacto de los colores tal como los escribiste.
+    // Postgres (jsonb) no garantiza el orden de las llaves de un objeto,
+    // así que sin esta lista el orden de columnas puede cambiar al recargar.
+    const colores = cols.map((c) => c.nombre)
+    const estadosPrevios = camEditIdx !== null ? (tempCam[camEditIdx]?.estados || {}) : {}
+    const nuevoItem = { tipos, precios, es_juego: esJuego, diseno: camDiseno, imagenes: camImgs, tabla, colores, total_unidades: totalU, total_precio: totalPrecio, estados: estadosPrevios }
+
+    if (camEditIdx !== null) {
+      setTempCam((prev) => prev.map((x, i) => (i === camEditIdx ? nuevoItem : x)))
+      showToast('✅', 'Ítem actualizado')
+    } else {
+      setTempCam((prev) => [...prev, nuevoItem])
+      showToast('✅', 'Ítem añadido al pedido')
+    }
     resetItemForms()
-    showToast('✅', 'Ítem añadido al pedido')
+  }
+
+  // Reabre un ítem ya guardado (aún no persistido) en el formulario para corregirlo.
+  function editarItemCam(idx) {
+    const it = tempCam[idx]
+    const tipos = it.tipos || []
+    const colores = (it.colores && it.colores.length) ? it.colores : derivarColoresCam(it.tabla)
+    const cants = {}
+    TALLAS.forEach((talla, ri) => {
+      const tallaObj = (it.tabla || {})[talla]
+      if (!tallaObj) return
+      colores.forEach((colorName, ci) => {
+        const colObj = tallaObj[colorName]
+        if (!colObj) return
+        tipos.forEach((t) => {
+          const n = colObj[t]
+          if (n > 0) {
+            if (!cants[ri]) cants[ri] = {}
+            cants[ri][`${ci}_${t}`] = n
+          }
+        })
+      })
+    })
+    setCamSelTipos(new Set(tipos))
+    setCamCols(colores.length ? colores : [''])
+    setCamCants(cants)
+    setCamDiseno(it.diseno || '')
+    setCamPrecios(it.precios || {})
+    setCamImgs(it.imagenes || [])
+    setCamEsJuego(!!(it.precios && it.precios.juego))
+    setCamEditIdx(idx)
+    setOpenCam(true)
   }
 
   function guardarItemChaq() {
@@ -197,9 +243,53 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
     if (!totalU) { showToast('⚠️', 'Ingresa al menos una cantidad'); return }
     const precios = {}
     tipos.forEach((t) => { precios[t] = parseFloat(chaqPrecios[t]) || 0 })
-    setTempChaq((prev) => [...prev, { tipos, precios, diseno: chaqDiseno, imagenes: chaqImgs, tabla, total_unidades: totalU, kilos_reales: null, total_final: null, estados: {} }])
+    const colores = rows.map((r) => r.nombre)
+
+    // Si el ítem que se edita ya tenía un peso registrado, lo conservamos y
+    // recalculamos el total con el precio actual (por si también lo cambiaste).
+    let kilosReales = null, totalFinal = null, estadosPrevios = {}
+    if (chaqEditIdx !== null) {
+      const anterior = tempChaq[chaqEditIdx]
+      estadosPrevios = anterior?.estados || {}
+      if (anterior?.kilos_reales != null) {
+        kilosReales = anterior.kilos_reales
+        totalFinal = kilosReales * (precios[tipos[0]] || 0)
+      }
+    }
+
+    const nuevoItem = { tipos, precios, diseno: chaqDiseno, imagenes: chaqImgs, tabla, colores, total_unidades: totalU, kilos_reales: kilosReales, total_final: totalFinal, estados: estadosPrevios }
+
+    if (chaqEditIdx !== null) {
+      setTempChaq((prev) => prev.map((x, i) => (i === chaqEditIdx ? nuevoItem : x)))
+      showToast('✅', 'Ítem actualizado')
+    } else {
+      setTempChaq((prev) => [...prev, nuevoItem])
+      showToast('✅', 'Ítem añadido al pedido')
+    }
     resetItemForms()
-    showToast('✅', 'Ítem añadido al pedido')
+  }
+
+  function editarItemChaq(idx) {
+    const it = tempChaq[idx]
+    const tipos = it.tipos || []
+    const colores = (it.colores && it.colores.length) ? it.colores : Object.keys(it.tabla || {})
+    const cants = {}
+    colores.forEach((colorName, ri) => {
+      const rowObj = (it.tabla || {})[colorName]
+      if (!rowObj) return
+      tipos.forEach((t) => {
+        const n = rowObj[t]
+        if (n > 0) { if (!cants[ri]) cants[ri] = {}; cants[ri][t] = n }
+      })
+    })
+    setChaqSelTipos(new Set(tipos))
+    setChaqRows(colores.length ? colores : [''])
+    setChaqCants(cants)
+    setChaqDiseno(it.diseno || '')
+    setChaqPrecios(it.precios || {})
+    setChaqImgs(it.imagenes || [])
+    setChaqEditIdx(idx)
+    setOpenChaq(true)
   }
 
   async function guardarPedido() {
@@ -239,7 +329,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
       if (tempCam.length) {
         const rows = tempCam.map((it) => ({
           pedido_id: pedidoId, tipos: it.tipos, precios: it.precios, diseno: it.diseno,
-          imagenes: it.imagenes, tabla: it.tabla, total_unidades: it.total_unidades,
+          imagenes: it.imagenes, tabla: it.tabla, colores: it.colores || [], total_unidades: it.total_unidades,
           total_precio: it.total_precio, estados: it.estados || {},
         }))
         const { error } = await supabase.from('items_camiseta').insert(rows)
@@ -248,7 +338,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
       if (tempChaq.length) {
         const rows = tempChaq.map((it) => ({
           pedido_id: pedidoId, tipos: it.tipos, precios: it.precios, diseno: it.diseno,
-          imagenes: it.imagenes, tabla: it.tabla, total_unidades: it.total_unidades,
+          imagenes: it.imagenes, tabla: it.tabla, colores: it.colores || [], total_unidades: it.total_unidades,
           kilos_reales: it.kilos_reales, total_final: it.total_final, estados: it.estados || {},
         }))
         const { error } = await supabase.from('items_chaqueta').insert(rows)
@@ -292,7 +382,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
         </div>
         <div className={`sec-body ${openCam ? 'open' : ''}`}>
           {tempCam.map((it, i) => (
-            <ItemCardCam key={i} it={it} onDelete={() => setTempCam((p) => p.filter((_, idx) => idx !== i))} />
+            <ItemCardCam key={i} it={it} onDelete={() => setTempCam((p) => p.filter((_, idx) => idx !== i))} onEdit={() => editarItemCam(i)} />
           ))}
 
           <div style={{ marginBottom: 6, fontSize: 11, color: 'var(--muted)', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '.06em' }}>
@@ -337,7 +427,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
           </div>
 
           {tempChaq.map((it, i) => (
-            <ItemCardChaq key={i} it={it} onDelete={() => setTempChaq((p) => p.filter((_, idx) => idx !== i))} />
+            <ItemCardChaq key={i} it={it} onDelete={() => setTempChaq((p) => p.filter((_, idx) => idx !== i))} onEdit={() => editarItemChaq(i)} />
           ))}
 
           <div style={{ marginBottom: 6, fontSize: 11, color: 'var(--muted)', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '.06em' }}>
@@ -390,12 +480,13 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
 
 // ====== Subcomponentes ======
 
-function ItemCardCam({ it, onDelete }) {
+function ItemCardCam({ it, onDelete, onEdit }) {
   const tLabel = it.tipos.map((t) => `${TIPO_ICON[t]} ${TIPO_LABEL[t]}`).join(' + ')
-  const colsPresentes = []
-  Object.values(it.tabla || {}).forEach((tallaObj) => {
-    Object.keys(tallaObj).forEach((c) => { if (!colsPresentes.includes(c)) colsPresentes.push(c) })
-  })
+  // Usamos el orden guardado explícitamente (it.colores). Si el ítem es viejo
+  // y no lo tiene, lo reconstruimos como respaldo (puede no coincidir con el
+  // orden original porque Postgres no preserva el orden de un objeto jsonb).
+  const colsPresentes = (it.colores && it.colores.length) ? it.colores : derivarColoresCam(it.tabla)
+  const tallasPresentes = TALLAS.filter((t) => it.tabla && it.tabla[t])
   return (
     <div className="iblk cam">
       <div className="iblk-hdr">
@@ -407,6 +498,7 @@ function ItemCardCam({ it, onDelete }) {
         <div className="iblk-meta">
           <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: "'DM Mono', monospace" }}>{it.total_unidades}u · {fmtCOP(it.total_precio)}</span>
           <span className="itot">{fmtCOP(it.total_precio)}</span>
+          <button className="btn btn-s btn-sm" title="Editar ítem" onClick={onEdit}>✏️</button>
           <button className="btn btn-d btn-sm" onClick={onDelete}>✕</button>
         </div>
       </div>
@@ -415,7 +507,8 @@ function ItemCardCam({ it, onDelete }) {
           <table className="tg">
             <thead><tr><th className="th-l">Talla</th>{colsPresentes.map((c) => <th key={c}>{c}</th>)}<th>Total</th></tr></thead>
             <tbody>
-              {Object.entries(it.tabla || {}).map(([talla, tallaObj]) => {
+              {tallasPresentes.map((talla) => {
+                const tallaObj = it.tabla[talla]
                 const tot = colsPresentes.reduce((s, c) => s + ((tallaObj[c] && Object.values(tallaObj[c]).reduce((a, b) => a + b, 0)) || 0), 0)
                 return (
                   <tr key={talla}>
@@ -440,8 +533,17 @@ function ItemCardCam({ it, onDelete }) {
   )
 }
 
-function ItemCardChaq({ it, onDelete }) {
+function derivarColoresCam(tabla) {
+  const list = []
+  Object.values(tabla || {}).forEach((tallaObj) => {
+    Object.keys(tallaObj).forEach((c) => { if (!list.includes(c)) list.push(c) })
+  })
+  return list
+}
+
+function ItemCardChaq({ it, onDelete, onEdit }) {
   const tLabel = it.tipos.map((t) => `${TIPO_ICON[t]} ${TIPO_LABEL[t]}`).join(' + ')
+  const coloresPresentes = ((it.colores && it.colores.length) ? it.colores : Object.keys(it.tabla || {})).filter((c) => it.tabla && it.tabla[c])
   return (
     <div className="iblk chaq">
       <div className="iblk-hdr">
@@ -453,7 +555,8 @@ function ItemCardChaq({ it, onDelete }) {
           <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: "'DM Mono', monospace" }}>
             {it.tipos.map((t) => `${TIPO_LABEL[t]}: ${fmtCOP(it.precios[t])}/kg`).join(' · ')}
           </span>
-          <span className="itot pend">⚖️ Pendiente</span>
+          <span className={`itot ${it.kilos_reales ? '' : 'pend'}`}>{it.kilos_reales ? `✅ ${fmtCOP(it.total_final)}` : '⚖️ Pendiente'}</span>
+          <button className="btn btn-s btn-sm" title="Editar ítem" onClick={onEdit}>✏️</button>
           <button className="btn btn-d btn-sm" onClick={onDelete}>✕</button>
         </div>
       </div>
@@ -462,7 +565,8 @@ function ItemCardChaq({ it, onDelete }) {
           <table className="tg">
             <thead><tr><th className="th-l">Color</th>{it.tipos.map((t) => <th key={t}>{TIPO_ICON[t]} {TIPO_LABEL[t]}</th>)}<th>Total</th></tr></thead>
             <tbody>
-              {Object.entries(it.tabla || {}).map(([color, rowObj]) => {
+              {coloresPresentes.map((color) => {
+                const rowObj = it.tabla[color]
                 const tot = it.tipos.reduce((s, t) => s + (rowObj[t] || 0), 0)
                 return (
                   <tr key={color}>

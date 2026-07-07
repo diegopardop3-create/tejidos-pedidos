@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { TIPO_LABEL, TIPO_ICON, fmtFecha, fmtCOP, calcProgreso, ESTADOS, ESTADO_ICON, fmtCOP as _f } from './constants'
+import { TIPO_LABEL, TIPO_ICON, fmtFecha, fmtCOP, calcProgreso, ESTADOS, ESTADO_ICON, TALLAS } from './constants'
 import { generarFacturaPDF, imprimirEtiqueta } from './factura'
 import PanelPagos from './PanelPagos'
 
@@ -142,10 +142,16 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
 
 function ItemCamView({ it, onToggle, onImgClick }) {
   const tLabel = it.tipos.map((t) => `${TIPO_ICON[t]} ${TIPO_LABEL[t]}`).join(' + ')
-  const coloresPresentes = []
-  Object.values(it.tabla || {}).forEach((tallaObj) => {
-    Object.keys(tallaObj).forEach((c) => { if (!coloresPresentes.includes(c)) coloresPresentes.push(c) })
-  })
+  // Orden explícito guardado; si el ítem es viejo y no lo tiene, lo derivamos
+  // como respaldo (Postgres no garantiza el orden de un objeto jsonb).
+  const coloresPresentes = (it.colores && it.colores.length) ? it.colores : (() => {
+    const list = []
+    Object.values(it.tabla || {}).forEach((tallaObj) => {
+      Object.keys(tallaObj).forEach((c) => { if (!list.includes(c)) list.push(c) })
+    })
+    return list
+  })()
+  const tallasPresentes = TALLAS.filter((t) => it.tabla && it.tabla[t])
 
   return (
     <div style={{ background: 'var(--loom)', border: '1px solid var(--cbd)', borderRadius: 9, padding: 12, marginBottom: 8 }}>
@@ -173,7 +179,8 @@ function ItemCamView({ it, onToggle, onImgClick }) {
             </tr>
           </thead>
           <tbody>
-            {Object.entries(it.tabla || {}).map(([talla, tallaObj]) => {
+            {tallasPresentes.map((talla) => {
+              const tallaObj = it.tabla[talla]
               let totFila = 0
               return (
                 <tr key={talla}>
@@ -219,6 +226,7 @@ function ItemChaqView({ it, estadoPedido, onToggle, onPesaje, onImgClick }) {
   const [kg, setKg] = useState(it.kilos_reales || '')
   const tLabel = it.tipos.map((t) => `${TIPO_ICON[t]} ${TIPO_LABEL[t]}`).join(' + ')
   const p0 = it.precios[it.tipos[0]] || 0
+  const coloresPresentes = ((it.colores && it.colores.length) ? it.colores : Object.keys(it.tabla || {})).filter((c) => it.tabla && it.tabla[c])
 
   return (
     <div style={{ background: 'var(--loom)', border: '1px solid var(--jbd)', borderRadius: 9, padding: 12, marginBottom: 8 }}>
@@ -234,7 +242,8 @@ function ItemChaqView({ it, estadoPedido, onToggle, onPesaje, onImgClick }) {
         <table className="tg">
           <thead><tr><th className="th-l">Color / Referencia</th>{it.tipos.map((t) => <th key={t} className="th-item-chaq">{TIPO_ICON[t]} {TIPO_LABEL[t]}</th>)}<th>Total</th></tr></thead>
           <tbody>
-            {Object.entries(it.tabla || {}).map(([color, rowObj]) => {
+            {coloresPresentes.map((color) => {
+              const rowObj = it.tabla[color]
               let totF = 0
               return (
                 <tr key={color}>
