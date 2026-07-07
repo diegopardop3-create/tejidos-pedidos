@@ -5,6 +5,24 @@ import { TALLAS, TIPO_LABEL, TIPO_ICON, hoy, ESTADOS, ESTADO_ICON, fmtCOP } from
 const TIPOS_CAM = ['puno', 'cuello']
 const TIPOS_CHAQ = ['pretina', 'cuello', 'puno']
 
+// Un color puede tener un color principal y varias "rayas" en orden
+// (ej: Marfil con raya Negra, raya Roja, raya Azul). Esto arma el nombre
+// combinado tal como ya lo escribías a mano: "Marfil-Negro-Rojo-Azul".
+function nombreColor(c, ci) {
+  const p = (c?.principal || '').trim()
+  const rayas = (c?.rayas || []).map((r) => (r || '').trim()).filter(Boolean)
+  if (!p && !rayas.length) return `Color ${ci + 1}`
+  return [p || `Color ${ci + 1}`, ...rayas].join('-')
+}
+
+// Reconstruye {principal, rayas} a partir de un nombre combinado guardado
+// (para poder reabrir un ítem y editar cada raya por separado).
+function splitColorNombre(nombre) {
+  const partes = String(nombre || '').split('-').map((p) => p.trim()).filter(Boolean)
+  if (!partes.length) return { principal: '', rayas: [] }
+  return { principal: partes[0], rayas: partes.slice(1) }
+}
+
 export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit, showToast, userId }) {
   const [cliente, setCliente] = useState('')
   const [fecha, setFecha] = useState(hoy())
@@ -21,15 +39,16 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
   const [camSelTipos, setCamSelTipos] = useState(new Set())
   const [chaqSelTipos, setChaqSelTipos] = useState(new Set())
 
-  const [camCols, setCamCols] = useState([''])
+  const [camCols, setCamCols] = useState([{ principal: '', rayas: [] }])
   const [camCants, setCamCants] = useState({})
   const [camDiseno, setCamDiseno] = useState('')
   const [camPrecios, setCamPrecios] = useState({})
   const [camImgs, setCamImgs] = useState([])
   const [camEsJuego, setCamEsJuego] = useState(false)
   const [camEditIdx, setCamEditIdx] = useState(null) // idx en tempCam que se está editando, o null si es nuevo
+  const [camTallasSel, setCamTallasSel] = useState(new Set()) // tallas que aplican a este ítem
 
-  const [chaqRows, setChaqRows] = useState([''])
+  const [chaqRows, setChaqRows] = useState([{ principal: '', rayas: [] }])
   const [chaqCants, setChaqCants] = useState({})
   const [chaqDiseno, setChaqDiseno] = useState('')
   const [chaqPrecios, setChaqPrecios] = useState({})
@@ -56,8 +75,16 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
   }, [editPedido, pedidos])
 
   function resetItemForms() {
-    setCamSelTipos(new Set()); setCamCols(['']); setCamCants({}); setCamDiseno(''); setCamPrecios({}); setCamImgs([]); setCamEsJuego(false); setCamEditIdx(null)
-    setChaqSelTipos(new Set()); setChaqRows(['']); setChaqCants({}); setChaqDiseno(''); setChaqPrecios({}); setChaqImgs([]); setChaqEditIdx(null)
+    setCamSelTipos(new Set()); setCamCols([{ principal: '', rayas: [] }]); setCamCants({}); setCamDiseno(''); setCamPrecios({}); setCamImgs([]); setCamEsJuego(false); setCamEditIdx(null); setCamTallasSel(new Set())
+    setChaqSelTipos(new Set()); setChaqRows([{ principal: '', rayas: [] }]); setChaqCants({}); setChaqDiseno(''); setChaqPrecios({}); setChaqImgs([]); setChaqEditIdx(null)
+  }
+
+  function toggleTalla(t) {
+    setCamTallasSel((prev) => {
+      const n = new Set(prev)
+      if (n.has(t)) n.delete(t); else n.add(t)
+      return n
+    })
   }
 
   function limpiarTodo() {
@@ -85,7 +112,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
       return n
     })
   }
-  function camAddCol() { setCamCols((c) => [...c, '']) }
+  function camAddCol() { setCamCols((c) => [...c, { principal: '', rayas: [] }]) }
   function camDelCol(ci) {
     if (camCols.length <= 1) { showToast('⚠️', 'Debe haber al menos un color'); return }
     const tipos = [...camSelTipos]
@@ -116,7 +143,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
       return n
     })
   }
-  function chaqAddRow() { setChaqRows((r) => [...r, '']) }
+  function chaqAddRow() { setChaqRows((r) => [...r, { principal: '', rayas: [] }]) }
   function chaqDelRow(ri) {
     if (chaqRows.length <= 1) { showToast('⚠️', 'Debe haber al menos un color'); return }
     setChaqRows((rows) => rows.filter((_, i) => i !== ri))
@@ -147,10 +174,12 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
   function guardarItemCam() {
     const tipos = [...camSelTipos]
     if (!tipos.length) { showToast('⚠️', 'Selecciona Puño y/o Cuello'); return }
-    const cols = camCols.map((c, ci) => ({ nombre: c || `Color ${ci + 1}`, ci }))
+    if (!camTallasSel.size) { showToast('⚠️', 'Selecciona al menos una talla'); return }
+    const cols = camCols.map((c, ci) => ({ nombre: nombreColor(c, ci), ci }))
     const tabla = {}
     let totalU = 0
     TALLAS.forEach((talla, ri) => {
+      if (!camTallasSel.has(talla)) return
       const tallaObj = {}
       cols.forEach(({ nombre, ci }) => {
         const colObj = {}
@@ -216,12 +245,13 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
       })
     })
     setCamSelTipos(new Set(tipos))
-    setCamCols(colores.length ? colores : [''])
+    setCamCols(colores.length ? colores.map(splitColorNombre) : [{ principal: '', rayas: [] }])
     setCamCants(cants)
     setCamDiseno(it.diseno || '')
     setCamPrecios(it.precios || {})
     setCamImgs(it.imagenes || [])
     setCamEsJuego(!!(it.precios && it.precios.juego))
+    setCamTallasSel(new Set(TALLAS.filter((t) => it.tabla && it.tabla[t])))
     setCamEditIdx(idx)
     setOpenCam(true)
   }
@@ -229,7 +259,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
   function guardarItemChaq() {
     const tipos = [...chaqSelTipos]
     if (!tipos.length) { showToast('⚠️', 'Selecciona Pretina, Cuello y/o Puño'); return }
-    const rows = chaqRows.map((c, ri) => ({ nombre: c || `Color ${ri + 1}`, ri }))
+    const rows = chaqRows.map((c, ri) => ({ nombre: nombreColor(c, ri), ri }))
     const tabla = {}
     let totalU = 0
     rows.forEach(({ nombre, ri }) => {
@@ -283,7 +313,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
       })
     })
     setChaqSelTipos(new Set(tipos))
-    setChaqRows(colores.length ? colores : [''])
+    setChaqRows(colores.length ? colores.map(splitColorNombre) : [{ principal: '', rayas: [] }])
     setChaqCants(cants)
     setChaqDiseno(it.diseno || '')
     setChaqPrecios(it.precios || {})
@@ -405,6 +435,9 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
               setV={camSetV} addCol={camAddCol} delCol={camDelCol}
               setCols={setCamCols}
               esJuego={camEsJuego} setEsJuego={setCamEsJuego}
+              tallasSel={camTallasSel} onToggleTalla={toggleTalla}
+              onSelectAllTallas={() => setCamTallasSel(new Set(TALLAS))}
+              onClearTallas={() => setCamTallasSel(new Set())}
               onImgs={(e) => handleImgs(e, 'cam')}
               onDelImg={(i) => setCamImgs((p) => p.filter((_, idx) => idx !== i))}
               onCancel={resetItemForms}
@@ -587,7 +620,7 @@ function ItemCardChaq({ it, onDelete, onEdit }) {
   )
 }
 
-function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, setPrecios, setV, addCol, delCol, setCols, onImgs, onDelImg, onCancel, onSave, esJuego, setEsJuego }) {
+function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, setPrecios, setV, addCol, delCol, setCols, onImgs, onDelImg, onCancel, onSave, esJuego, setEsJuego, tallasSel, onToggleTalla, onSelectAllTallas, onClearTallas }) {
   const puedeSerJuego = tipos.length === 2 && tipos.includes('puno') && tipos.includes('cuello')
   return (
     <div className="add-form">
@@ -640,20 +673,83 @@ function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, s
         </div>
       </div>
 
-      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ctx)', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ctx)', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>
         Tabla de tallas × colores
       </div>
+      <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
+        En cada columna: el color principal arriba, y abajo puedes añadir tantas rayas como necesites, en el orden en que van (Raya 1, Raya 2, Raya 3...).
+      </div>
 
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {TALLAS.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => onToggleTalla(t)}
+              style={{
+                padding: '4px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                border: tallasSel.has(t) ? '1.5px solid #4b8523' : '1.5px solid var(--border)',
+                background: tallasSel.has(t) ? '#4b8523' : 'var(--white)',
+                color: tallasSel.has(t) ? '#fff' : 'var(--muted)',
+              }}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button type="button" onClick={onSelectAllTallas} style={{ fontSize: 11, color: 'var(--thread)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Todas</button>
+          <button type="button" onClick={onClearTallas} style={{ fontSize: 11, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Ninguna</button>
+        </div>
+      </div>
+
+      {!tallasSel.size ? (
+        <div style={{ padding: '18px', textAlign: 'center', color: 'var(--muted)', fontSize: 13, border: '1.5px dashed var(--border)', borderRadius: 9 }}>
+          Selecciona arriba las tallas que necesitas para este ítem.
+        </div>
+      ) : (
       <div className="tscroll cam-scroll">
         <table className="tg">
           <thead>
             <tr>
               <th className="th-l" rowSpan={2}>Talla</th>
               {cols.map((c, ci) => (
-                <th key={ci} colSpan={tipos.length} style={{ borderLeft: '2px solid rgba(255,255,255,.2)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-                    <input className="colinp" value={c} placeholder={`Color ${ci + 1}`} onChange={(e) => setCols((prev) => prev.map((x, i) => (i === ci ? e.target.value : x)))} />
-                    {cols.length > 1 && <button className="coldel" onClick={() => delCol(ci)}>✕</button>}
+                <th key={ci} colSpan={tipos.length} style={{ borderLeft: '2px solid rgba(255,255,255,.2)', verticalAlign: 'top' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '3px 0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+                      <input
+                        className="colinp" value={c.principal} placeholder={`Color ${ci + 1}`}
+                        onChange={(e) => setCols((prev) => prev.map((x, i) => (i === ci ? { ...x, principal: e.target.value } : x)))}
+                      />
+                      {cols.length > 1 && <button className="coldel" onClick={() => delCol(ci)}>✕</button>}
+                    </div>
+                    {(c.rayas || []).map((raya, ridx) => (
+                      <div key={ridx} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <span style={{ fontSize: 8, color: 'var(--yarn)', opacity: .75, flexShrink: 0 }}>R{ridx + 1}</span>
+                        <input
+                          className="colinp" value={raya} placeholder={`raya ${ridx + 1}`}
+                          style={{ width: 58, fontSize: 9 }}
+                          onChange={(e) => setCols((prev) => prev.map((x, i) => {
+                            if (i !== ci) return x
+                            const nr = [...(x.rayas || [])]; nr[ridx] = e.target.value
+                            return { ...x, rayas: nr }
+                          }))}
+                        />
+                        <button
+                          className="coldel" style={{ fontSize: 10 }}
+                          onClick={() => setCols((prev) => prev.map((x, i) => {
+                            if (i !== ci) return x
+                            return { ...x, rayas: (x.rayas || []).filter((_, k) => k !== ridx) }
+                          }))}
+                        >✕</button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      style={{ fontSize: 9, color: 'var(--yarn)', background: 'none', border: '1px dashed rgba(183,228,199,.6)', borderRadius: 4, padding: '1px 7px', cursor: 'pointer' }}
+                      onClick={() => setCols((prev) => prev.map((x, i) => (i === ci ? { ...x, rayas: [...(x.rayas || []), ''] } : x)))}
+                    >＋ raya</button>
                   </div>
                 </th>
               ))}
@@ -667,7 +763,8 @@ function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, s
             </tr>
           </thead>
           <tbody>
-            {TALLAS.map((talla, ri) => {
+            {TALLAS.filter((t) => tallasSel.has(t)).map((talla) => {
+              const ri = TALLAS.indexOf(talla)
               const totFila = cols.reduce((s, _, ci) => s + tipos.reduce((s2, t) => s2 + (+(cants[ri] || {})[`${ci}_${t}`] || 0), 0), 0)
               return (
                 <tr key={talla}>
@@ -688,16 +785,17 @@ function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, s
             <tr className="tr-tot cam">
               <td className="td-l">Total</td>
               {cols.map((_, ci) => tipos.map((t) => {
-                const tot = TALLAS.reduce((s, _, ri) => s + (+(cants[ri] || {})[`${ci}_${t}`] || 0), 0)
+                const tot = TALLAS.filter((tl) => tallasSel.has(tl)).reduce((s, tl) => s + (+(cants[TALLAS.indexOf(tl)] || {})[`${ci}_${t}`] || 0), 0)
                 return <td key={`${ci}_${t}`}>{tot || ''}</td>
               }))}
               <td className="td-tot-end cam">
-                {TALLAS.reduce((s, _, ri) => s + cols.reduce((s2, _, ci) => s2 + tipos.reduce((s3, t) => s3 + (+(cants[ri] || {})[`${ci}_${t}`] || 0), 0), 0), 0) || ''}
+                {TALLAS.filter((tl) => tallasSel.has(tl)).reduce((s, tl) => s + cols.reduce((s2, _, ci) => s2 + tipos.reduce((s3, t) => s3 + (+(cants[TALLAS.indexOf(tl)] || {})[`${ci}_${t}`] || 0), 0), 0), 0) || ''}
               </td>
             </tr>
           </tbody>
         </table>
       </div>
+      )}
 
       <div className="brow" style={{ marginTop: 12 }}>
         <button className="btn btn-s btn-sm" onClick={onCancel}>Cancelar</button>
@@ -752,10 +850,44 @@ function FormularioChaq({ tipos, rows, cants, diseno, precios, imgs, setDiseno, 
               const totF = tipos.reduce((s, t) => s + (+(cants[ri] || {})[t] || 0), 0)
               return (
                 <tr key={ri}>
-                  <td className="td-key chaq" style={{ minWidth: 140 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <input className="rowinp chaq" value={col} placeholder={`Color ${ri + 1}`} style={{ flex: 1 }} onChange={(e) => setRows((prev) => prev.map((x, i) => (i === ri ? e.target.value : x)))} />
-                      {rows.length > 1 && <button className="rowdel" onClick={() => delRow(ri)}>✕</button>}
+                  <td className="td-key chaq" style={{ minWidth: 190 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <input
+                          className="rowinp chaq" value={col.principal} placeholder={`Color ${ri + 1}`} style={{ flex: 1 }}
+                          onChange={(e) => setRows((prev) => prev.map((x, i) => (i === ri ? { ...x, principal: e.target.value } : x)))}
+                        />
+                        {rows.length > 1 && <button className="rowdel" onClick={() => delRow(ri)}>✕</button>}
+                      </div>
+                      {(col.rayas || []).length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                          {col.rayas.map((raya, ridx) => (
+                            <div key={ridx} style={{ display: 'flex', alignItems: 'center', gap: 2, background: '#fff8e8', borderRadius: 5, padding: '1px 4px' }}>
+                              <span style={{ fontSize: 8, color: 'var(--jtx)', flexShrink: 0 }}>R{ridx + 1}</span>
+                              <input
+                                value={raya} placeholder="color" style={{ width: 54, fontSize: 10, border: 'none', background: 'none', outline: 'none' }}
+                                onChange={(e) => setRows((prev) => prev.map((x, i) => {
+                                  if (i !== ri) return x
+                                  const nr = [...(x.rayas || [])]; nr[ridx] = e.target.value
+                                  return { ...x, rayas: nr }
+                                }))}
+                              />
+                              <button
+                                style={{ background: 'none', border: 'none', color: '#c8a84a', cursor: 'pointer', fontSize: 10 }}
+                                onClick={() => setRows((prev) => prev.map((x, i) => {
+                                  if (i !== ri) return x
+                                  return { ...x, rayas: (x.rayas || []).filter((_, k) => k !== ridx) }
+                                }))}
+                              >✕</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        style={{ fontSize: 10, color: 'var(--jtx)', background: 'none', border: '1px dashed #e0bd72', borderRadius: 4, padding: '1px 7px', cursor: 'pointer', alignSelf: 'flex-start' }}
+                        onClick={() => setRows((prev) => prev.map((x, i) => (i === ri ? { ...x, rayas: [...(x.rayas || []), ''] } : x)))}
+                      >＋ raya</button>
                     </div>
                   </td>
                   {tipos.map((t) => {
