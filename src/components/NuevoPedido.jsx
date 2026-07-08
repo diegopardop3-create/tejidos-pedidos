@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import { TALLAS, TIPO_LABEL, TIPO_ICON, hoy, ESTADOS, ESTADO_ICON, fmtCOP } from './constants'
+import ColorSwatch from './ColorSwatch'
+import FormulaColorBoton from './FormulaColorBoton'
 
 const TIPOS_CAM = ['puno', 'cuello']
 const TIPOS_CHAQ = ['pretina', 'cuello', 'puno']
@@ -412,7 +414,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
         </div>
         <div className={`sec-body ${openCam ? 'open' : ''}`}>
           {tempCam.map((it, i) => (
-            <ItemCardCam key={i} it={it} onDelete={() => setTempCam((p) => p.filter((_, idx) => idx !== i))} onEdit={() => editarItemCam(i)} />
+            <ItemCardCam key={i} it={it} onDelete={() => setTempCam((p) => p.filter((_, idx) => idx !== i))} onEdit={() => editarItemCam(i)} showToast={showToast} />
           ))}
 
           <div style={{ marginBottom: 6, fontSize: 11, color: 'var(--muted)', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '.06em' }}>
@@ -442,6 +444,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
               onDelImg={(i) => setCamImgs((p) => p.filter((_, idx) => idx !== i))}
               onCancel={resetItemForms}
               onSave={guardarItemCam}
+              showToast={showToast}
             />
           )}
         </div>
@@ -460,7 +463,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
           </div>
 
           {tempChaq.map((it, i) => (
-            <ItemCardChaq key={i} it={it} onDelete={() => setTempChaq((p) => p.filter((_, idx) => idx !== i))} onEdit={() => editarItemChaq(i)} />
+            <ItemCardChaq key={i} it={it} onDelete={() => setTempChaq((p) => p.filter((_, idx) => idx !== i))} onEdit={() => editarItemChaq(i)} showToast={showToast} />
           ))}
 
           <div style={{ marginBottom: 6, fontSize: 11, color: 'var(--muted)', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '.06em' }}>
@@ -486,6 +489,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
               onDelImg={(i) => setChaqImgs((p) => p.filter((_, idx) => idx !== i))}
               onCancel={resetItemForms}
               onSave={guardarItemChaq}
+              showToast={showToast}
             />
           )}
         </div>
@@ -513,7 +517,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
 
 // ====== Subcomponentes ======
 
-function ItemCardCam({ it, onDelete, onEdit }) {
+function ItemCardCam({ it, onDelete, onEdit, showToast }) {
   const tLabel = it.tipos.map((t) => `${TIPO_ICON[t]} ${TIPO_LABEL[t]}`).join(' + ')
   // Usamos el orden guardado explícitamente (it.colores). Si el ítem es viejo
   // y no lo tiene, lo reconstruimos como respaldo (puede no coincidir con el
@@ -538,7 +542,7 @@ function ItemCardCam({ it, onDelete, onEdit }) {
       <div className="iblk-body">
         <div className="tscroll cam-scroll">
           <table className="tg">
-            <thead><tr><th className="th-l">Talla</th>{colsPresentes.map((c) => <th key={c}>{c}</th>)}<th>Total</th></tr></thead>
+            <thead><tr><th className="th-l">Talla</th>{colsPresentes.map((c) => <th key={c}><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}><ColorSwatch nombre={c} /><span>{c}</span><FormulaColorBoton nombreColor={c} showToast={showToast} /></div></th>)}<th>Total</th></tr></thead>
             <tbody>
               {tallasPresentes.map((talla) => {
                 const tallaObj = it.tabla[talla]
@@ -574,7 +578,7 @@ function derivarColoresCam(tabla) {
   return list
 }
 
-function ItemCardChaq({ it, onDelete, onEdit }) {
+function ItemCardChaq({ it, onDelete, onEdit, showToast }) {
   const tLabel = it.tipos.map((t) => `${TIPO_ICON[t]} ${TIPO_LABEL[t]}`).join(' + ')
   const coloresPresentes = ((it.colores && it.colores.length) ? it.colores : Object.keys(it.tabla || {})).filter((c) => it.tabla && it.tabla[c])
   return (
@@ -596,14 +600,14 @@ function ItemCardChaq({ it, onDelete, onEdit }) {
       <div className="iblk-body">
         <div className="tscroll chaq-scroll">
           <table className="tg">
-            <thead><tr><th className="th-l">Color</th>{it.tipos.map((t) => <th key={t}>{TIPO_ICON[t]} {TIPO_LABEL[t]}</th>)}<th>Total</th></tr></thead>
+            <thead><tr><th className="th-l">Color</th>{it.tipos.map((t) => <th key={t}>{TIPO_LABEL[t]}</th>)}<th>Total</th></tr></thead>
             <tbody>
               {coloresPresentes.map((color) => {
                 const rowObj = it.tabla[color]
                 const tot = it.tipos.reduce((s, t) => s + (rowObj[t] || 0), 0)
                 return (
                   <tr key={color}>
-                    <td className="td-key chaq">{color}</td>
+                    <td className="td-key chaq"><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><ColorSwatch nombre={color} /><span>{color}</span><FormulaColorBoton nombreColor={color} showToast={showToast} /></div></td>
                     {it.tipos.map((t) => <td key={t} style={{ textAlign: 'center', fontFamily: "'DM Mono', monospace" }}>{rowObj[t] || ''}</td>)}
                     <td className="td-tot-end chaq">{tot}</td>
                   </tr>
@@ -620,7 +624,7 @@ function ItemCardChaq({ it, onDelete, onEdit }) {
   )
 }
 
-function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, setPrecios, setV, addCol, delCol, setCols, onImgs, onDelImg, onCancel, onSave, esJuego, setEsJuego, tallasSel, onToggleTalla, onSelectAllTallas, onClearTallas }) {
+function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, setPrecios, setV, addCol, delCol, setCols, onImgs, onDelImg, onCancel, onSave, esJuego, setEsJuego, tallasSel, onToggleTalla, onSelectAllTallas, onClearTallas, showToast }) {
   const puedeSerJuego = tipos.length === 2 && tipos.includes('puno') && tipos.includes('cuello')
   return (
     <div className="add-form">
@@ -717,11 +721,13 @@ function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, s
               {cols.map((c, ci) => (
                 <th key={ci} colSpan={tipos.length} style={{ borderLeft: '2px solid rgba(255,255,255,.2)', verticalAlign: 'top' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '3px 0' }}>
+                    <ColorSwatch nombre={nombreColor(c, ci)} size={11} />
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
                       <input
                         className="colinp" value={c.principal} placeholder={`Color ${ci + 1}`}
                         onChange={(e) => setCols((prev) => prev.map((x, i) => (i === ci ? { ...x, principal: e.target.value } : x)))}
                       />
+                      <FormulaColorBoton nombreColor={nombreColor(c, ci)} showToast={showToast} />
                       {cols.length > 1 && <button className="coldel" onClick={() => delCol(ci)}>✕</button>}
                     </div>
                     {(c.rayas || []).map((raya, ridx) => (
@@ -758,7 +764,7 @@ function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, s
             </tr>
             <tr>
               {cols.map((_, ci) => tipos.map((t) => (
-                <th key={`${ci}_${t}`} className="th-item-cam" style={{ borderLeft: '1px solid rgba(255,255,255,.15)' }}>{TIPO_ICON[t]} {TIPO_LABEL[t]}</th>
+                <th key={`${ci}_${t}`} className="th-item-cam" style={{ borderLeft: '1px solid rgba(255,255,255,.15)' }}>{TIPO_LABEL[t]}</th>
               )))}
             </tr>
           </thead>
@@ -805,7 +811,7 @@ function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, s
   )
 }
 
-function FormularioChaq({ tipos, rows, cants, diseno, precios, imgs, setDiseno, setPrecios, setV, addRow, delRow, setRows, onImgs, onDelImg, onCancel, onSave }) {
+function FormularioChaq({ tipos, rows, cants, diseno, precios, imgs, setDiseno, setPrecios, setV, addRow, delRow, setRows, onImgs, onDelImg, onCancel, onSave, showToast }) {
   return (
     <div className="add-form">
       <div className="af-title">Nuevo ítem — {tipos.map((t) => `${TIPO_ICON[t]} ${TIPO_LABEL[t]}`).join(' + ')}</div>
@@ -844,7 +850,7 @@ function FormularioChaq({ tipos, rows, cants, diseno, precios, imgs, setDiseno, 
 
       <div className="tscroll chaq-scroll">
         <table className="tg">
-          <thead><tr><th className="th-l">Color / Referencia</th>{tipos.map((t) => <th key={t} className="th-item-chaq">{TIPO_ICON[t]} {TIPO_LABEL[t]}</th>)}<th>Total</th></tr></thead>
+          <thead><tr><th className="th-l">Color / Referencia</th>{tipos.map((t) => <th key={t} className="th-item-chaq">{TIPO_LABEL[t]}</th>)}<th>Total</th></tr></thead>
           <tbody>
             {rows.map((col, ri) => {
               const totF = tipos.reduce((s, t) => s + (+(cants[ri] || {})[t] || 0), 0)
@@ -853,10 +859,12 @@ function FormularioChaq({ tipos, rows, cants, diseno, precios, imgs, setDiseno, 
                   <td className="td-key chaq" style={{ minWidth: 190 }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <ColorSwatch nombre={nombreColor(col, ri)} size={13} />
                         <input
                           className="rowinp chaq" value={col.principal} placeholder={`Color ${ri + 1}`} style={{ flex: 1 }}
                           onChange={(e) => setRows((prev) => prev.map((x, i) => (i === ri ? { ...x, principal: e.target.value } : x)))}
                         />
+                        <FormulaColorBoton nombreColor={nombreColor(col, ri)} showToast={showToast} />
                         {rows.length > 1 && <button className="rowdel" onClick={() => delRow(ri)}>✕</button>}
                       </div>
                       {(col.rayas || []).length > 0 && (

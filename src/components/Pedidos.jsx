@@ -5,6 +5,7 @@ import ListaPedidos from './ListaPedidos'
 import Resumen from './Resumen'
 import ListaPrecios from './ListaPrecios'
 import DetalleModal from './DetalleModal'
+import ConfirmarEliminar from './ConfirmarEliminar'
 import logo from '../assets/logo.png'
 import './styles.css'
 
@@ -15,6 +16,7 @@ export default function Pedidos({ session }) {
   const [detalleIdx, setDetalleIdx] = useState(null)
   const [editPedido, setEditPedido] = useState(null)
   const [toast, setToast] = useState(null)
+  const [pedidoAEliminar, setPedidoAEliminar] = useState(null)
 
   const showToast = useCallback((icon, msg) => {
     setToast({ icon, msg })
@@ -123,13 +125,7 @@ export default function Pedidos({ session }) {
             }}
             onCompartir={handleCompartir}
             refrescar={cargarPedidos}
-            onEliminar={async (pedido) => {
-              if (!confirm(`¿Eliminar pedido ${pedido.numero}?`)) return
-              const { error } = await supabase.from('pedidos').delete().eq('id', pedido.id)
-              if (error) { showToast('⚠️', 'Error al eliminar'); return }
-              showToast('🗑️', 'Pedido eliminado')
-              cargarPedidos()
-            }}
+            onEliminar={(pedido) => setPedidoAEliminar(pedido)}
             showToast={showToast}
             titulo="Pedidos Activos"
           />
@@ -145,13 +141,7 @@ export default function Pedidos({ session }) {
             }}
             onCompartir={handleCompartir}
             refrescar={cargarPedidos}
-            onEliminar={async (pedido) => {
-              if (!confirm(`¿Eliminar pedido ${pedido.numero}?`)) return
-              const { error } = await supabase.from('pedidos').delete().eq('id', pedido.id)
-              if (error) { showToast('⚠️', 'Error al eliminar'); return }
-              showToast('🗑️', 'Pedido eliminado')
-              cargarPedidos()
-            }}
+            onEliminar={(pedido) => setPedidoAEliminar(pedido)}
             showToast={showToast}
             titulo="Pedidos Entregados"
             soloEntregados
@@ -173,6 +163,19 @@ export default function Pedidos({ session }) {
             setEditPedido(pedidos[detalleIdx])
             setDetalleIdx(null)
             setTab('nuevo')
+          }}
+          showToast={showToast}
+        />
+      )}
+
+      {pedidoAEliminar && (
+        <ConfirmarEliminar
+          pedido={pedidoAEliminar}
+          session={session}
+          onCancel={() => setPedidoAEliminar(null)}
+          onConfirmed={() => {
+            setPedidoAEliminar(null)
+            cargarPedidos()
           }}
           showToast={showToast}
         />

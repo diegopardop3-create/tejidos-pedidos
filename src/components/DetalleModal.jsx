@@ -3,6 +3,8 @@ import { supabase } from '../supabaseClient'
 import { TIPO_LABEL, TIPO_ICON, fmtFecha, fmtCOP, calcProgreso, ESTADOS, ESTADO_ICON, TALLAS } from './constants'
 import { generarFacturaPDF, imprimirEtiqueta } from './factura'
 import PanelPagos from './PanelPagos'
+import ColorSwatch from './ColorSwatch'
+import FormulaColorBoton from './FormulaColorBoton'
 
 export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onCompartir, showToast }) {
   const [lightbox, setLightbox] = useState(null)
@@ -84,6 +86,7 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
             <div className="prod-legend">
               <span>Toca para marcar cada cantidad:</span><span>✅ Completa</span><span>❓ Falta</span>
               <span style={{ color: 'var(--muted)', fontSize: 10 }}>(toca de nuevo para quitar)</span>
+              <span style={{ color: 'var(--muted)', fontSize: 10 }}>· En camiseta: 🧵 tejido y 📦 revisado/empacado son etapas independientes</span>
             </div>
           </>
         )}
@@ -92,7 +95,7 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
           <div className="msec">
             <h4>👔 Camiseta — {pedido.items_camiseta.length} ítem(s)</h4>
             {pedido.items_camiseta.map((it) => (
-              <ItemCamView key={it.id} it={it} onToggle={toggleCelda} onImgClick={setLightbox} />
+              <ItemCamView key={it.id} it={it} onToggle={toggleCelda} onImgClick={setLightbox} showToast={showToast} />
             ))}
           </div>
         )}
@@ -101,7 +104,7 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
           <div className="msec">
             <h4>🧥 Chaqueta — {pedido.items_chaqueta.length} ítem(s)</h4>
             {pedido.items_chaqueta.map((it) => (
-              <ItemChaqView key={it.id} it={it} estadoPedido={pedido.estado} onToggle={toggleCelda} onPesaje={guardarPesaje} onImgClick={setLightbox} />
+              <ItemChaqView key={it.id} it={it} estadoPedido={pedido.estado} onToggle={toggleCelda} onPesaje={guardarPesaje} onImgClick={setLightbox} showToast={showToast} />
             ))}
           </div>
         )}
@@ -140,7 +143,7 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
   )
 }
 
-function ItemCamView({ it, onToggle, onImgClick }) {
+function ItemCamView({ it, onToggle, onImgClick, showToast }) {
   const tLabel = it.tipos.map((t) => `${TIPO_ICON[t]} ${TIPO_LABEL[t]}`).join(' + ')
   // Orden explícito guardado; si el ítem es viejo y no lo tiene, lo derivamos
   // como respaldo (Postgres no garantiza el orden de un objeto jsonb).
@@ -169,12 +172,20 @@ function ItemCamView({ it, onToggle, onImgClick }) {
           <thead>
             <tr>
               <th className="th-l" rowSpan={2}>Talla</th>
-              {coloresPresentes.map((c) => <th key={c} colSpan={it.tipos.length} style={{ borderLeft: '2px solid rgba(255,255,255,.2)' }}>{c}</th>)}
+              {coloresPresentes.map((c) => (
+                <th key={c} colSpan={it.tipos.length} style={{ borderLeft: '2px solid rgba(255,255,255,.2)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                    <ColorSwatch nombre={c} />
+                    <span>{c}</span>
+                    <FormulaColorBoton nombreColor={c} showToast={showToast} />
+                  </div>
+                </th>
+              ))}
               <th rowSpan={2}>Total</th>
             </tr>
             <tr>
               {coloresPresentes.map((c) => it.tipos.map((t) => (
-                <th key={`${c}_${t}`} className="th-item-cam" style={{ borderLeft: '1px solid rgba(255,255,255,.15)' }}>{TIPO_ICON[t]} {TIPO_LABEL[t]}</th>
+                <th key={`${c}_${t}`} className="th-item-cam" style={{ borderLeft: '1px solid rgba(255,255,255,.15)' }}>{TIPO_LABEL[t]}</th>
               )))}
             </tr>
           </thead>
@@ -189,14 +200,25 @@ function ItemCamView({ it, onToggle, onImgClick }) {
                     const n = (tallaObj[c] || {})[t] || 0
                     if (!n) return <td key={`${c}_${t}`} style={{ borderLeft: t === it.tipos[0] ? '2px solid #c8e6c9' : '1px solid var(--border)', textAlign: 'center', color: '#ccc' }}>—</td>
                     totFila += n
-                    const ek = `${talla}|${c}|${t}`
-                    const est = (it.estados || {})[ek]
+                    const base = `${talla}|${c}|${t}`
+                    const ekTejido = `${base}|tejido`
+                    const ekEmpacado = `${base}|revisado`
+                    const estTejido = (it.estados || {})[ekTejido]
+                    const estEmpacado = (it.estados || {})[ekEmpacado]
                     return (
-                      <td key={`${c}_${t}`} className={est === 'ok' ? 'st-ok' : est === 'falta' ? 'st-falta' : ''} style={{ borderLeft: t === it.tipos[0] ? '2px solid #c8e6c9' : '1px solid var(--border)' }}>
-                        <div className="cell-estado">
+                      <td key={`${c}_${t}`} className={estEmpacado === 'ok' ? 'st-ok' : estEmpacado === 'falta' ? 'st-falta' : ''} style={{ borderLeft: t === it.tipos[0] ? '2px solid #c8e6c9' : '1px solid var(--border)' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                           <span className="cell-cant">{n}</span>
-                          <button className="cell-btn" title="Completo" onClick={() => onToggle(it, it.id, ek, 'ok')}>✅</button>
-                          <button className="cell-btn" title="Falta" onClick={() => onToggle(it, it.id, ek, 'falta')}>❓</button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <span style={{ fontSize: 8, color: 'var(--muted)' }} title="Tejido">🧵</span>
+                            <button className="cell-btn" title="Tejido: completo" style={{ opacity: estTejido === 'ok' ? 1 : .35 }} onClick={() => onToggle(it, it.id, ekTejido, 'ok')}>✅</button>
+                            <button className="cell-btn" title="Tejido: falta" style={{ opacity: estTejido === 'falta' ? 1 : .35 }} onClick={() => onToggle(it, it.id, ekTejido, 'falta')}>❓</button>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <span style={{ fontSize: 8, color: 'var(--muted)' }} title="Revisado y empacado">📦</span>
+                            <button className="cell-btn" title="Revisado y empacado: completo" style={{ opacity: estEmpacado === 'ok' ? 1 : .35 }} onClick={() => onToggle(it, it.id, ekEmpacado, 'ok')}>✅</button>
+                            <button className="cell-btn" title="Revisado y empacado: falta" style={{ opacity: estEmpacado === 'falta' ? 1 : .35 }} onClick={() => onToggle(it, it.id, ekEmpacado, 'falta')}>❓</button>
+                          </div>
                         </div>
                       </td>
                     )
@@ -222,7 +244,7 @@ function ItemCamView({ it, onToggle, onImgClick }) {
   )
 }
 
-function ItemChaqView({ it, estadoPedido, onToggle, onPesaje, onImgClick }) {
+function ItemChaqView({ it, estadoPedido, onToggle, onPesaje, onImgClick, showToast }) {
   const [kg, setKg] = useState(it.kilos_reales || '')
   const tLabel = it.tipos.map((t) => `${TIPO_ICON[t]} ${TIPO_LABEL[t]}`).join(' + ')
   const p0 = it.precios[it.tipos[0]] || 0
@@ -240,14 +262,14 @@ function ItemChaqView({ it, estadoPedido, onToggle, onPesaje, onImgClick }) {
 
       <div className="tscroll chaq-scroll">
         <table className="tg">
-          <thead><tr><th className="th-l">Color / Referencia</th>{it.tipos.map((t) => <th key={t} className="th-item-chaq">{TIPO_ICON[t]} {TIPO_LABEL[t]}</th>)}<th>Total</th></tr></thead>
+          <thead><tr><th className="th-l">Color / Referencia</th>{it.tipos.map((t) => <th key={t} className="th-item-chaq">{TIPO_LABEL[t]}</th>)}<th>Total</th></tr></thead>
           <tbody>
             {coloresPresentes.map((color) => {
               const rowObj = it.tabla[color]
               let totF = 0
               return (
                 <tr key={color}>
-                  <td className="td-key chaq">{color}</td>
+                  <td className="td-key chaq"><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><ColorSwatch nombre={color} /><span>{color}</span><FormulaColorBoton nombreColor={color} showToast={showToast} /></div></td>
                   {it.tipos.map((t) => {
                     const n = rowObj[t] || 0
                     if (!n) return <td key={t} style={{ textAlign: 'center', color: '#ccc' }}>—</td>
