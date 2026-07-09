@@ -682,6 +682,7 @@ function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, s
       </div>
       <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
         En cada columna: el color principal arriba, y abajo puedes añadir tantas rayas como necesites, en el orden en que van (Raya 1, Raya 2, Raya 3...).
+        Debajo de "Cuello"/"Puño" en cada columna hay un campo chiquito: escribe un número y presiona Enter para aplicarlo a todas las tallas seleccionadas de una vez (útil si vas a hacer la misma cantidad en todas las tallas).
       </div>
 
       <div style={{ marginBottom: 8 }}>
@@ -778,7 +779,22 @@ function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, s
             </tr>
             <tr>
               {cols.map((_, ci) => tipos.map((t) => (
-                <th key={`${ci}_${t}`} className="th-item-cam" style={{ borderLeft: '1px solid rgba(255,255,255,.15)' }}>{TIPO_LABEL[t]}</th>
+                <th key={`${ci}_${t}`} className="th-item-cam" style={{ borderLeft: '1px solid rgba(255,255,255,.15)' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                    <span>{TIPO_LABEL[t]}</span>
+                    <input
+                      type="number" min="0" placeholder="igual en todas"
+                      title="Escribe un número y presiona Enter para aplicarlo a todas las tallas seleccionadas de esta columna"
+                      style={{ width: 74, fontSize: 9, padding: '2px 4px', borderRadius: 4, border: 'none', textAlign: 'center', fontFamily: "'DM Mono', monospace" }}
+                      onKeyDown={(e) => {
+                        if (e.key !== 'Enter') return
+                        const val = e.target.value
+                        TALLAS.filter((tl) => tallasSel.has(tl)).forEach((tl) => setV(TALLAS.indexOf(tl), `${ci}_${t}`, val))
+                        e.target.value = ''
+                      }}
+                    />
+                  </div>
+                </th>
               )))}
             </tr>
           </thead>
