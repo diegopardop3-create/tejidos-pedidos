@@ -2,13 +2,35 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { MESES, TIPO_LABEL, fmtCOP } from './constants'
 
-export default function Resumen({ pedidos }) {
+export default function Resumen({ pedidos, session, showToast }) {
   const [abonos, setAbonos] = useState([]) // todos los abonos para calcular cartera
+  const [enviando, setEnviando] = useState(false)
+  const [mesReporte, setMesReporte] = useState(new Date().getMonth())
+  const [anioReporte, setAnioReporte] = useState(new Date().getFullYear())
 
   useEffect(() => {
     supabase.from('abonos').select('pedido_id, monto')
       .then(({ data }) => setAbonos(data || []))
   }, [])
+
+  async function enviarReporteMes() {
+    setEnviando(true)
+    try {
+      const { data: { session: s } } = await supabase.auth.getSession()
+      const resp = await fetch('/api/reporte-mensual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.access_token}` },
+        body: JSON.stringify({ mes: mesReporte, anio: anioReporte }),
+      })
+      const data = await resp.json()
+      if (!resp.ok) throw new Error(data.error || 'Error al generar el reporte')
+      showToast?.('📧', `Reporte de ${MESES[mesReporte]} enviado a tu correo`)
+    } catch (err) {
+      showToast?.('⚠️', 'No se pudo enviar: ' + err.message)
+    } finally {
+      setEnviando(false)
+    }
+  }
 
   const now = new Date()
   const mes = now.getMonth()
@@ -87,6 +109,26 @@ export default function Resumen({ pedidos }) {
 
   return (
     <div>
+      {/* Reporte mensual de pedidos entregados */}
+      <div className="card" style={{ background: 'var(--weave)', border: '1px solid var(--cbd)' }}>
+        <div className="ctitle">📊 Reporte de pedidos entregados</div>
+        <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
+          El día 1 de cada mes recibes automáticamente por correo el Excel del mes anterior.
+          También puedes pedir uno de un mes específico ahora mismo:
+        </p>
+        <div className="brow" style={{ alignItems: 'center' }}>
+          <select value={mesReporte} onChange={(e) => setMesReporte(Number(e.target.value))} style={{ padding: '8px 11px', border: '1px solid var(--border)', borderRadius: 7, fontSize: 13 }}>
+            {MESES.map((m, i) => <option key={m} value={i}>{m}</option>)}
+          </select>
+          <select value={anioReporte} onChange={(e) => setAnioReporte(Number(e.target.value))} style={{ padding: '8px 11px', border: '1px solid var(--border)', borderRadius: 7, fontSize: 13 }}>
+            {[anioReporte - 1, anioReporte].map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+          <button className="btn btn-p" onClick={enviarReporteMes} disabled={enviando}>
+            {enviando ? 'Enviando…' : '📧 Enviar Excel de este mes por correo'}
+          </button>
+        </div>
+      </div>
+
       {/* Tarjetas principales */}
       <div className="rgrid">
         <div className="rc dk"><div className="rl">Total Pedidos</div><div className="rv">{total}</div><div className="rsb">registrados</div></div>

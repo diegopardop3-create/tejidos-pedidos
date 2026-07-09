@@ -684,28 +684,42 @@ function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, s
         En cada columna: el color principal arriba, y abajo puedes añadir tantas rayas como necesites, en el orden en que van (Raya 1, Raya 2, Raya 3...).
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {TALLAS.map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => onToggleTalla(t)}
-              style={{
-                padding: '4px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                border: tallasSel.has(t) ? '1.5px solid #4b8523' : '1.5px solid var(--border)',
-                background: tallasSel.has(t) ? '#4b8523' : 'var(--white)',
-                color: tallasSel.has(t) ? '#fff' : 'var(--muted)',
-              }}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-        <div style={{ display: 'flex', gap: 6 }}>
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginBottom: 6 }}>
           <button type="button" onClick={onSelectAllTallas} style={{ fontSize: 11, color: 'var(--thread)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Todas</button>
           <button type="button" onClick={onClearTallas} style={{ fontSize: 11, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Ninguna</button>
         </div>
+
+        {[
+          { titulo: 'Niño — individual o unida (usa la que necesites por pedido)', tallas: ['2', '4', '2-4', '6', '8', '6-8', '10', '12', '10-12', '14', '16', '14-16'] },
+          { titulo: 'Adulto', tallas: ['S', 'M', 'L', 'XL', '2XL', '3XL'] },
+        ].map((grupo) => (
+          <div key={grupo.titulo} style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: 10, color: 'var(--muted)', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>{grupo.titulo}</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {grupo.tallas.map((t) => {
+                const esCombinada = t.includes('-')
+                const sel = tallasSel.has(t)
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => onToggleTalla(t)}
+                    title={esCombinada ? 'Talla combinada' : 'Talla individual'}
+                    style={{
+                      padding: '4px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      border: sel ? '1.5px solid #4b8523' : esCombinada ? '1.5px dashed var(--border)' : '1.5px solid var(--border)',
+                      background: sel ? '#4b8523' : 'var(--white)',
+                      color: sel ? '#fff' : 'var(--muted)',
+                    }}
+                  >
+                    {t}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </div>
 
       {!tallasSel.size ? (

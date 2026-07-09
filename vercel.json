@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/reporte-mensual",
+      "schedule": "0 13 * * *"
+    }
+  ]
+}

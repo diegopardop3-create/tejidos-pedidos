@@ -183,9 +183,11 @@ td.st-falta { background: #fff3cd; }
 .iblk.chaq .iblk-hdr { background: #fff4e0; }
 .iblk-label { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .iblk-meta { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.badge { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; font-family: 'DM Mono', monospace; white-space: nowrap; }
+.badge { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; font-family: 'DM Mono', monospace; white-space: nowrap; animation: badgePop .32s cubic-bezier(.34,1.56,.64,1); transition: transform .15s ease; }
+.badge:hover { transform: scale(1.06); }
 .badge.cam { background: #d0f0dc; color: var(--ctx); }
 .badge.chaq { background: #fff0d0; color: var(--jtx); }
+@keyframes badgePop { from { opacity: 0; transform: scale(.75); } to { opacity: 1; transform: scale(1); } }
 .itot { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 700; color: var(--thread); background: var(--weave); padding: 3px 10px; border-radius: 20px; }
 .itot.pend { color: var(--warn); background: #fff8e1; }
 .iblk-body { padding: 10px 14px; }

@@ -1,4 +1,7 @@
-export const TALLAS = ['2-4', '6-8', '10-12', '14-16', 'S', 'M', 'L', 'XL', '2XL', '3XL']
+// Incluye las tallas individuales (2, 4, 6...) y también las combinadas
+// (2-4, 6-8...) como opciones aparte — en cada pedido eliges cuáles usar,
+// según si el cliente pide tallas separadas o unidas.
+export const TALLAS = ['2', '4', '2-4', '6', '8', '6-8', '10', '12', '10-12', '14', '16', '14-16', 'S', 'M', 'L', 'XL', '2XL', '3XL']
 export const TIPO_LABEL = { puno: 'Puño', cuello: 'Cuello', pretina: 'Pretina' }
 export const TIPO_ICON = { puno: '🧤', cuello: '🔵', pretina: '📏' }
 export const MESES = [

@@ -16,7 +16,9 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
     (pr.total === 0 && (pedido.items_chaqueta || []).every((it) => it.kilos_reales != null))
 
   async function cambiarEstado(nuevoEstado) {
-    const { error } = await supabase.from('pedidos').update({ estado: nuevoEstado, actualizado_en: new Date().toISOString() }).eq('id', pedido.id)
+    const cambios = { estado: nuevoEstado, actualizado_en: new Date().toISOString() }
+    if (nuevoEstado === 'Entregado') cambios.fecha_entregado = new Date().toISOString().slice(0, 10)
+    const { error } = await supabase.from('pedidos').update(cambios).eq('id', pedido.id)
     if (error) { showToast('⚠️', 'Error al cambiar estado'); return }
     showToast(ESTADO_ICON[nuevoEstado], `Estado actualizado a ${nuevoEstado}`)
     onUpdated()

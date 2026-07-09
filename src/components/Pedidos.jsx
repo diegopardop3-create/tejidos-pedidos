@@ -148,7 +148,7 @@ export default function Pedidos({ session }) {
           />
         )}
 
-        {tab === 'resumen' && <Resumen pedidos={pedidos} />}
+        {tab === 'resumen' && <Resumen pedidos={pedidos} session={session} showToast={showToast} />}
 
         {tab === 'precios' && <ListaPrecios showToast={showToast} />}
       </div>
