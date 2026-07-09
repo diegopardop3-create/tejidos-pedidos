@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
-import { TALLAS, TIPO_LABEL, TIPO_ICON, hoy, ESTADOS, ESTADO_ICON, fmtCOP } from './constants'
+import { TALLAS, TALLA_SIN_DIVIDIR, TIPO_LABEL, TIPO_ICON, hoy, ESTADOS, ESTADO_ICON, fmtCOP } from './constants'
 import ColorSwatch from './ColorSwatch'
 import FormulaColorBoton from './FormulaColorBoton'
 
@@ -49,6 +49,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
   const [camEsJuego, setCamEsJuego] = useState(false)
   const [camEditIdx, setCamEditIdx] = useState(null) // idx en tempCam que se está editando, o null si es nuevo
   const [camTallasSel, setCamTallasSel] = useState(new Set()) // tallas que aplican a este ítem
+  const [camPunoSinDividir, setCamPunoSinDividir] = useState(false) // si el puño va en una sola cantidad, sin dividir por talla
 
   const [chaqRows, setChaqRows] = useState([{ principal: '', rayas: [] }])
   const [chaqCants, setChaqCants] = useState({})
@@ -77,7 +78,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
   }, [editPedido, pedidos])
 
   function resetItemForms() {
-    setCamSelTipos(new Set()); setCamCols([{ principal: '', rayas: [] }]); setCamCants({}); setCamDiseno(''); setCamPrecios({}); setCamImgs([]); setCamEsJuego(false); setCamEditIdx(null); setCamTallasSel(new Set())
+    setCamSelTipos(new Set()); setCamCols([{ principal: '', rayas: [] }]); setCamCants({}); setCamDiseno(''); setCamPrecios({}); setCamImgs([]); setCamEsJuego(false); setCamEditIdx(null); setCamTallasSel(new Set()); setCamPunoSinDividir(false)
     setChaqSelTipos(new Set()); setChaqRows([{ principal: '', rayas: [] }]); setChaqCants({}); setChaqDiseno(''); setChaqPrecios({}); setChaqImgs([]); setChaqEditIdx(null)
   }
 
@@ -193,6 +194,16 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
       })
       if (Object.keys(tallaObj).length) tabla[talla] = tallaObj
     })
+    // Fila especial: puño sin dividir por talla (una sola cantidad para
+    // varias tallas a la vez). Solo aplica al tipo "puno".
+    if (camPunoSinDividir && tipos.includes('puno')) {
+      const filaSD = {}
+      cols.forEach(({ nombre, ci }) => {
+        const n = +(camCants['SD'] || {})[`${ci}_puno`] || 0
+        if (n > 0) { filaSD[nombre] = { puno: n }; totalU += n }
+      })
+      if (Object.keys(filaSD).length) tabla[TALLA_SIN_DIVIDIR] = filaSD
+    }
     if (!totalU) { showToast('⚠️', 'Ingresa al menos una cantidad'); return }
     const esJuego = camEsJuego && tipos.length === 2 && tipos.includes('puno') && tipos.includes('cuello')
     const precios = {}
@@ -256,6 +267,14 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
         })
       })
     })
+    // Reconstruir la fila especial de puño sin dividir, si el ítem la tiene.
+    const filaSD = (it.tabla || {})[TALLA_SIN_DIVIDIR]
+    if (filaSD) {
+      colores.forEach((colorName, ci) => {
+        const n = filaSD[colorName]?.puno
+        if (n > 0) { if (!cants['SD']) cants['SD'] = {}; cants['SD'][`${ci}_puno`] = n }
+      })
+    }
     setCamSelTipos(new Set(tipos))
     setCamCols(colores.length ? colores.map(splitColorNombre) : [{ principal: '', rayas: [] }])
     setCamCants(cants)
@@ -263,6 +282,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
     setCamPrecios(it.precios || {})
     setCamImgs(it.imagenes || [])
     setCamEsJuego(!!(it.precios && it.precios.juego))
+    setCamPunoSinDividir(!!filaSD)
     setCamTallasSel(new Set(TALLAS.filter((t) => it.tabla && it.tabla[t])))
     setCamEditIdx(idx)
     setOpenCam(true)
@@ -450,6 +470,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
               tallasSel={camTallasSel} onToggleTalla={toggleTalla}
               onSelectAllTallas={() => setCamTallasSel(new Set(TALLAS))}
               onClearTallas={() => setCamTallasSel(new Set())}
+              punoSinDividir={camPunoSinDividir} setPunoSinDividir={setCamPunoSinDividir}
               onImgs={(e) => handleImgs(e, 'cam')}
               onDelImg={(i) => setCamImgs((p) => p.filter((_, idx) => idx !== i))}
               onCancel={resetItemForms}
@@ -534,6 +555,7 @@ function ItemCardCam({ it, onDelete, onEdit, showToast }) {
   // orden original porque Postgres no preserva el orden de un objeto jsonb).
   const colsPresentes = (it.colores && it.colores.length) ? it.colores : derivarColoresCam(it.tabla)
   const tallasPresentes = TALLAS.filter((t) => it.tabla && it.tabla[t])
+  if (it.tabla && it.tabla[TALLA_SIN_DIVIDIR]) tallasPresentes.push(TALLA_SIN_DIVIDIR)
   return (
     <div className="iblk cam">
       <div className="iblk-hdr">
@@ -634,7 +656,7 @@ function ItemCardChaq({ it, onDelete, onEdit, showToast }) {
   )
 }
 
-function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, setPrecios, setV, addCol, delCol, setCols, onImgs, onDelImg, onCancel, onSave, esJuego, setEsJuego, tallasSel, onToggleTalla, onSelectAllTallas, onClearTallas, showToast }) {
+function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, setPrecios, setV, addCol, delCol, setCols, onImgs, onDelImg, onCancel, onSave, esJuego, setEsJuego, tallasSel, onToggleTalla, onSelectAllTallas, onClearTallas, showToast, punoSinDividir, setPunoSinDividir }) {
   const puedeSerJuego = tipos.length === 2 && tipos.includes('puno') && tipos.includes('cuello')
   return (
     <div className="add-form">
@@ -692,7 +714,6 @@ function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, s
       </div>
       <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
         En cada columna: el color principal arriba, y abajo puedes añadir tantas rayas como necesites, en el orden en que van (Raya 1, Raya 2, Raya 3...).
-        Debajo de "Cuello"/"Puño" en cada columna hay un campo chiquito: escribe un número y presiona Enter para aplicarlo a todas las tallas seleccionadas de una vez (útil si vas a hacer la misma cantidad en todas las tallas).
       </div>
 
       <div style={{ marginBottom: 8 }}>
@@ -732,6 +753,19 @@ function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, s
           </div>
         ))}
       </div>
+
+      {tipos.includes('puno') && (
+        <div
+          onClick={() => setPunoSinDividir((v) => !v)}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 10, padding: '8px 12px', background: punoSinDividir ? '#eef3e6' : 'var(--loom)', border: '1px solid var(--border)', borderRadius: 8 }}
+        >
+          <span style={{ width: 18, height: 18, borderRadius: 5, border: '2px solid #4b8523', background: punoSinDividir ? '#4b8523' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 11, flexShrink: 0 }}>{punoSinDividir ? '✓' : ''}</span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#3d6b1c' }}>🧤 Puño sin dividir por talla</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>Actívalo si vas a cortar puños en una sola cantidad para varias tallas juntas, en vez de repartirlos talla por talla.</div>
+          </div>
+        </div>
+      )}
 
       {!tallasSel.size ? (
         <div style={{ padding: '18px', textAlign: 'center', color: 'var(--muted)', fontSize: 13, border: '1.5px dashed var(--border)', borderRadius: 9 }}>
@@ -789,22 +823,7 @@ function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, s
             </tr>
             <tr>
               {cols.map((_, ci) => tipos.map((t) => (
-                <th key={`${ci}_${t}`} className="th-item-cam" style={{ borderLeft: '1px solid rgba(255,255,255,.15)' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                    <span>{TIPO_LABEL[t]}</span>
-                    <input
-                      type="number" min="0" placeholder="igual en todas"
-                      title="Escribe un número y presiona Enter para aplicarlo a todas las tallas seleccionadas de esta columna"
-                      style={{ width: 74, fontSize: 9, padding: '2px 4px', borderRadius: 4, border: 'none', textAlign: 'center', fontFamily: "'DM Mono', monospace" }}
-                      onKeyDown={(e) => {
-                        if (e.key !== 'Enter') return
-                        const val = e.target.value
-                        TALLAS.filter((tl) => tallasSel.has(tl)).forEach((tl) => setV(TALLAS.indexOf(tl), `${ci}_${t}`, val))
-                        e.target.value = ''
-                      }}
-                    />
-                  </div>
-                </th>
+                <th key={`${ci}_${t}`} className="th-item-cam" style={{ borderLeft: '1px solid rgba(255,255,255,.15)' }}>{TIPO_LABEL[t]}</th>
               )))}
             </tr>
           </thead>
@@ -828,14 +847,37 @@ function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, s
                 </tr>
               )
             })}
+            {punoSinDividir && tipos.includes('puno') && (
+              <tr style={{ background: '#fdf8ee' }}>
+                <td className="td-key cam" style={{ fontSize: 11 }}>🧤 Todas (sin dividir)</td>
+                {cols.map((_, ci) => tipos.map((t) => {
+                  if (t !== 'puno') return <td key={`${ci}_${t}`} style={{ textAlign: 'center', color: '#ccc' }}>—</td>
+                  const key = `${ci}_puno`
+                  const v = (cants['SD'] || {})[key] || ''
+                  return (
+                    <td key={key} className="td-n" style={{ borderLeft: '2px solid #c8e6c9' }}>
+                      <input type="number" min="0" value={v} placeholder="—" className={v ? 'has-v' : ''} onChange={(e) => setV('SD', key, e.target.value)} />
+                    </td>
+                  )
+                }))}
+                <td className="td-tot-end cam">
+                  {cols.reduce((s, _, ci) => s + (+(cants['SD'] || {})[`${ci}_puno`] || 0), 0) || ''}
+                </td>
+              </tr>
+            )}
             <tr className="tr-tot cam">
               <td className="td-l">Total</td>
               {cols.map((_, ci) => tipos.map((t) => {
-                const tot = TALLAS.filter((tl) => tallasSel.has(tl)).reduce((s, tl) => s + (+(cants[TALLAS.indexOf(tl)] || {})[`${ci}_${t}`] || 0), 0)
+                let tot = TALLAS.filter((tl) => tallasSel.has(tl)).reduce((s, tl) => s + (+(cants[TALLAS.indexOf(tl)] || {})[`${ci}_${t}`] || 0), 0)
+                if (punoSinDividir && t === 'puno') tot += (+(cants['SD'] || {})[`${ci}_puno`] || 0)
                 return <td key={`${ci}_${t}`}>{tot || ''}</td>
               }))}
               <td className="td-tot-end cam">
-                {TALLAS.filter((tl) => tallasSel.has(tl)).reduce((s, tl) => s + cols.reduce((s2, _, ci) => s2 + tipos.reduce((s3, t) => s3 + (+(cants[TALLAS.indexOf(tl)] || {})[`${ci}_${t}`] || 0), 0), 0), 0) || ''}
+                {(() => {
+                  let gran = TALLAS.filter((tl) => tallasSel.has(tl)).reduce((s, tl) => s + cols.reduce((s2, _, ci) => s2 + tipos.reduce((s3, t) => s3 + (+(cants[TALLAS.indexOf(tl)] || {})[`${ci}_${t}`] || 0), 0), 0), 0)
+                  if (punoSinDividir) gran += cols.reduce((s, _, ci) => s + (+(cants['SD'] || {})[`${ci}_puno`] || 0), 0)
+                  return gran || ''
+                })()}
               </td>
             </tr>
           </tbody>

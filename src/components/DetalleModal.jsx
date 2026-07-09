@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { TIPO_LABEL, TIPO_ICON, fmtFecha, fmtCOP, calcProgreso, ESTADOS, ESTADO_ICON, TALLAS } from './constants'
+import { TIPO_LABEL, TIPO_ICON, fmtFecha, fmtCOP, calcProgreso, ESTADOS, ESTADO_ICON, TALLAS, TALLA_SIN_DIVIDIR } from './constants'
 import { generarFacturaPDF, imprimirEtiqueta } from './factura'
 import PanelPagos from './PanelPagos'
 import ColorSwatch from './ColorSwatch'
@@ -157,6 +157,7 @@ function ItemCamView({ it, onToggle, onImgClick, showToast }) {
     return list
   })()
   const tallasPresentes = TALLAS.filter((t) => it.tabla && it.tabla[t])
+  if (it.tabla && it.tabla[TALLA_SIN_DIVIDIR]) tallasPresentes.push(TALLA_SIN_DIVIDIR)
 
   return (
     <div style={{ background: 'var(--loom)', border: '1px solid var(--cbd)', borderRadius: 9, padding: 12, marginBottom: 8 }}>

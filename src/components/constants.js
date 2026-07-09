@@ -1,6 +1,11 @@
 // Incluye las tallas individuales (2, 4, 6...) y también las combinadas
 // (2-4, 6-8...) como opciones aparte — en cada pedido eliges cuáles usar,
 // según si el cliente pide tallas separadas o unidas.
+// Fila especial para cuando el puño no se divide por talla, sino que es
+// una sola cantidad que cubre varias tallas a la vez (útil cuando se cortan
+// puños genéricos de un lote sin separarlos por talla específica).
+export const TALLA_SIN_DIVIDIR = 'Todas (sin dividir)'
+
 export const TALLAS = ['2', '4', '2-4', '6', '8', '6-8', '10', '12', '10-12', '14', '16', '14-16', 'S', 'M', 'L', 'XL', '2XL', '3XL']
 export const TIPO_LABEL = { puno: 'Puño', cuello: 'Cuello', pretina: 'Pretina' }
 export const TIPO_ICON = { puno: '🧤', cuello: '🔵', pretina: '📏' }
