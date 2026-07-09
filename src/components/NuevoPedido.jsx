@@ -204,16 +204,26 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
     } else {
       tipos.forEach((t) => { precios[t] = parseFloat(camPrecios[t]) || 0 })
     }
-    const totalPrecio = tipos.reduce((s, t) => {
-      const uT = Object.values(tabla).reduce((s2, tallaObj) => s2 + Object.values(tallaObj).reduce((s3, colObj) => s3 + (colObj[t] || 0), 0), 0)
-      return s + uT * precios[t]
-    }, 0)
+    const totalPrecio = esJuego
+      // El precio de juego se cobra UNA sola vez por cada cuello — los puños
+      // de ese mismo juego ya están incluidos en ese precio, no se cobran aparte.
+      ? Object.values(tabla).reduce((s, tallaObj) => s + Object.values(tallaObj).reduce((s2, colObj) => s2 + (colObj['cuello'] || 0), 0), 0) * precios.juego
+      : tipos.reduce((s, t) => {
+          const uT = Object.values(tabla).reduce((s2, tallaObj) => s2 + Object.values(tallaObj).reduce((s3, colObj) => s3 + (colObj[t] || 0), 0), 0)
+          return s + uT * precios[t]
+        }, 0)
+    // Para un juego, "unidades" son los juegos (= cantidad de cuellos), no la
+    // suma de cuellos + puños — eso triplicaría el conteo si cada juego trae
+    // más de un puño.
+    const totalUnidadesFinal = esJuego
+      ? Object.values(tabla).reduce((s, tallaObj) => s + Object.values(tallaObj).reduce((s2, colObj) => s2 + (colObj['cuello'] || 0), 0), 0)
+      : totalU
     // Guardamos el orden exacto de los colores tal como los escribiste.
     // Postgres (jsonb) no garantiza el orden de las llaves de un objeto,
     // así que sin esta lista el orden de columnas puede cambiar al recargar.
     const colores = cols.map((c) => c.nombre)
     const estadosPrevios = camEditIdx !== null ? (tempCam[camEditIdx]?.estados || {}) : {}
-    const nuevoItem = { tipos, precios, es_juego: esJuego, diseno: camDiseno, imagenes: camImgs, tabla, colores, total_unidades: totalU, total_precio: totalPrecio, estados: estadosPrevios }
+    const nuevoItem = { tipos, precios, es_juego: esJuego, diseno: camDiseno, imagenes: camImgs, tabla, colores, total_unidades: totalUnidadesFinal, total_precio: totalPrecio, estados: estadosPrevios }
 
     if (camEditIdx !== null) {
       setTempCam((prev) => prev.map((x, i) => (i === camEditIdx ? nuevoItem : x)))
@@ -635,7 +645,7 @@ function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, s
           <span style={{ width: 20, height: 20, borderRadius: 5, border: '2px solid #4b8523', background: esJuego ? '#4b8523' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, flexShrink: 0 }}>{esJuego ? '✓' : ''}</span>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#3d6b1c' }}>Cobrar como juego (precio único)</div>
-            <div style={{ fontSize: 11, color: '#6a7d5a' }}>Un solo precio que aplica igual a cada cuello y cada puño, según su cantidad.</div>
+            <div style={{ fontSize: 11, color: '#6a7d5a' }}>Se cobra una vez por cada cuello — los puños de ese mismo juego van incluidos en ese precio, no se cobran aparte.</div>
           </div>
         </div>
       )}

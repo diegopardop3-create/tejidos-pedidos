@@ -239,7 +239,7 @@ function ItemCamView({ it, onToggle, onImgClick, showToast }) {
 
       <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, fontFamily: "'DM Mono', monospace" }}>
         {it.precios?.juego
-          ? `Juego (cuello + puño): ${fmtCOP(it.precios.juego)} por pieza`
+          ? `Juego (cuello + puño incluido): ${fmtCOP(it.precios.juego)} por cuello`
           : it.tipos.map((t) => `${TIPO_LABEL[t]}: ${fmtCOP(it.precios[t] || 0)}/u`).join(' · ')}
       </div>
     </div>
