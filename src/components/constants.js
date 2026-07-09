@@ -33,6 +33,20 @@ export function hoy() {
   return new Date().toISOString().slice(0, 10)
 }
 
+// Suma cuánto hay de cada tipo (cuello, puño) dentro de una tabla de
+// camiseta, sin importar en qué talla o fila esté (incluye la fila especial
+// de puño sin dividir). Se usa para mostrar el total de juegos/cuellos.
+export function totalesPorTipoCam(tabla) {
+  let cuello = 0, puno = 0
+  Object.values(tabla || {}).forEach((tallaObj) => {
+    Object.values(tallaObj).forEach((colObj) => {
+      cuello += colObj.cuello || 0
+      puno += colObj.puno || 0
+    })
+  })
+  return { cuello, puno }
+}
+
 export function fmtFecha(f) {
   if (!f) return '—'
   const [y, m, d] = f.split('-')

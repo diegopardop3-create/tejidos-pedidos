@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
-import { TALLAS, TALLA_SIN_DIVIDIR, TIPO_LABEL, TIPO_ICON, hoy, ESTADOS, ESTADO_ICON, fmtCOP } from './constants'
+import { TALLAS, TALLA_SIN_DIVIDIR, TIPO_LABEL, TIPO_ICON, hoy, ESTADOS, ESTADO_ICON, fmtCOP, totalesPorTipoCam } from './constants'
 import ColorSwatch from './ColorSwatch'
 import FormulaColorBoton from './FormulaColorBoton'
 
@@ -597,6 +597,22 @@ function ItemCardCam({ it, onDelete, onEdit, showToast }) {
         {it.imagenes?.length > 0 && (
           <div className="item-imgs">{it.imagenes.map((s, i) => <img key={i} className="item-img" src={s} alt="" />)}</div>
         )}
+        {(() => {
+          const { cuello, puno } = totalesPorTipoCam(it.tabla)
+          const esJuego = it.es_juego || it.precios?.juego
+          return (
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8, fontSize: 11, color: 'var(--muted)', fontFamily: "'DM Mono', monospace" }}>
+              {esJuego ? (
+                <span>🎽 Total de juegos (cuellos): <strong style={{ color: 'var(--ink)' }}>{cuello}</strong>{puno > 0 && ` · +${puno} puños incluidos`}</span>
+              ) : (
+                <>
+                  {cuello > 0 && <span>🔵 Total cuellos: <strong style={{ color: 'var(--ink)' }}>{cuello}</strong></span>}
+                  {puno > 0 && <span>🧤 Total puños: <strong style={{ color: 'var(--ink)' }}>{puno}</strong></span>}
+                </>
+              )}
+            </div>
+          )
+        })()}
       </div>
     </div>
   )
@@ -884,6 +900,47 @@ function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, s
         </table>
       </div>
       )}
+
+      {tallasSel.size > 0 && (() => {
+        let totalCuelloLive = 0, totalPunoLive = 0
+        TALLAS.filter((t) => tallasSel.has(t)).forEach((talla) => {
+          const ri = TALLAS.indexOf(talla)
+          cols.forEach((_, ci) => {
+            totalCuelloLive += +(cants[ri] || {})[`${ci}_cuello`] || 0
+            totalPunoLive += +(cants[ri] || {})[`${ci}_puno`] || 0
+          })
+        })
+        if (punoSinDividir) {
+          cols.forEach((_, ci) => { totalPunoLive += +(cants['SD'] || {})[`${ci}_puno`] || 0 })
+        }
+        if (!totalCuelloLive && !totalPunoLive) return null
+        return (
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', background: 'var(--ink)', borderRadius: 9, padding: '10px 16px', marginTop: 10 }}>
+            {esJuego ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 11, color: 'var(--yarn)', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '.06em' }}>🎽 Total de juegos (cuellos)</span>
+                <span style={{ fontSize: 18, fontWeight: 800, color: '#fff' }}>{totalCuelloLive}</span>
+                {totalPunoLive > 0 && <span style={{ fontSize: 11, color: 'var(--yarn)' }}>+ {totalPunoLive} puños incluidos, sin cobro aparte</span>}
+              </div>
+            ) : (
+              <>
+                {tipos.includes('cuello') && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 11, color: 'var(--yarn)', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '.06em' }}>🔵 Total cuellos</span>
+                    <span style={{ fontSize: 18, fontWeight: 800, color: '#fff' }}>{totalCuelloLive}</span>
+                  </div>
+                )}
+                {tipos.includes('puno') && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 11, color: 'var(--yarn)', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '.06em' }}>🧤 Total puños</span>
+                    <span style={{ fontSize: 18, fontWeight: 800, color: '#fff' }}>{totalPunoLive}</span>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )
+      })()}
 
       <div className="brow" style={{ marginTop: 12 }}>
         <button className="btn btn-s btn-sm" onClick={onCancel}>Cancelar</button>

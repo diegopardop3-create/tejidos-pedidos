@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { TIPO_LABEL, TIPO_ICON, fmtFecha, fmtCOP, calcProgreso, ESTADOS, ESTADO_ICON, TALLAS, TALLA_SIN_DIVIDIR } from './constants'
+import { TIPO_LABEL, TIPO_ICON, fmtFecha, fmtCOP, calcProgreso, ESTADOS, ESTADO_ICON, TALLAS, TALLA_SIN_DIVIDIR, totalesPorTipoCam } from './constants'
 import { generarFacturaPDF, imprimirEtiqueta } from './factura'
 import PanelPagos from './PanelPagos'
 import ColorSwatch from './ColorSwatch'
@@ -243,6 +243,23 @@ function ItemCamView({ it, onToggle, onImgClick, showToast }) {
           ? `Juego (cuello + puño incluido): ${fmtCOP(it.precios.juego)} por cuello`
           : it.tipos.map((t) => `${TIPO_LABEL[t]}: ${fmtCOP(it.precios[t] || 0)}/u`).join(' · ')}
       </div>
+
+      {(() => {
+        const { cuello, puno } = totalesPorTipoCam(it.tabla)
+        const esJuego = it.precios?.juego
+        return (
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8, padding: '8px 12px', background: 'var(--ink)', borderRadius: 7 }}>
+            {esJuego ? (
+              <span style={{ fontSize: 12, color: 'var(--yarn)' }}>🎽 Total de juegos (cuellos): <strong style={{ color: '#fff' }}>{cuello}</strong>{puno > 0 && ` · +${puno} puños incluidos`}</span>
+            ) : (
+              <>
+                {cuello > 0 && <span style={{ fontSize: 12, color: 'var(--yarn)' }}>🔵 Total cuellos: <strong style={{ color: '#fff' }}>{cuello}</strong></span>}
+                {puno > 0 && <span style={{ fontSize: 12, color: 'var(--yarn)' }}>🧤 Total puños: <strong style={{ color: '#fff' }}>{puno}</strong></span>}
+              </>
+            )}
+          </div>
+        )
+      })()}
     </div>
   )
 }
