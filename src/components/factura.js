@@ -1,5 +1,6 @@
 import { NEGOCIO, TIPO_LABEL, fmtFecha, fmtCOP } from './constants'
 import logoUrl from './../assets/logo.png'
+import { supabase } from '../supabaseClient'
 
 // Genera la factura como HTML imprimible y abre el diálogo de impresión/guardar como PDF.
 // Esto evita depender de librerías pesadas de generación de PDF en el navegador.
@@ -184,6 +185,99 @@ export function imprimirEtiqueta(pedido) {
     <div class="no-print">
       <button onclick="window.print()">🖨 Imprimir etiqueta</button>
       <p>Selecciona tu impresora Jadens en el diálogo de impresión. Si el tamaño no coincide, verifica que el papel esté configurado en 51×25mm.</p>
+    </div>
+  </body></html>`)
+  win.document.close()
+}
+
+// Comprobante condensado de 10.5 x 15 cm — pensado para impresoras térmicas
+// de etiquetas (como Jadens) que soportan tamaño de envío 4"x6", a diferencia
+// de la factura completa (generarFacturaPDF) que es para hoja carta/A4.
+export async function generarFacturaMini(pedido) {
+  const { data: abonos } = await supabase.from('abonos').select('monto, fecha').eq('pedido_id', pedido.id).order('fecha', { ascending: true })
+  const totalAbonado = (abonos || []).reduce((s, a) => s + (a.monto || 0), 0)
+
+  const itemsCam = pedido.items_camiseta || []
+  const itemsChaq = pedido.items_chaqueta || []
+
+  const filas = [
+    ...itemsCam.map((it) => {
+      const tLabel = it.tipos.map((t) => TIPO_LABEL[t]).join('+')
+      return `<div class="fm-row"><span>${tLabel} camiseta</span><span>${fmtCOP(it.total_precio)}</span></div>`
+    }),
+    ...itemsChaq.map((it) => {
+      const tLabel = it.tipos.map((t) => TIPO_LABEL[t]).join('+')
+      const val = it.kilos_reales ? fmtCOP(it.total_final) : 'Pend. pesaje'
+      return `<div class="fm-row"><span>${tLabel} chaqueta</span><span>${val}</span></div>`
+    }),
+  ].join('')
+
+  const totalCam = pedido.total_camiseta || 0
+  const totalChaqFinal = itemsChaq.reduce((s, it) => s + (it.total_final || 0), 0)
+  const pendientePesaje = itemsChaq.some((it) => !it.kilos_reales)
+  const totalGeneral = totalCam + totalChaqFinal
+  const saldo = Math.max(0, totalGeneral - totalAbonado)
+
+  const win = window.open('', '_blank')
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Comprobante ${pedido.numero}</title>
+  <style>
+    @page { size: 105mm 150mm; margin: 6mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; color: #1a3c63; font-size: 11pt; }
+    .fm-header { text-align: center; border-bottom: 2px solid #4b8523; padding-bottom: 6px; margin-bottom: 8px; }
+    .fm-header img { height: 40px; margin-bottom: 4px; }
+    .fm-header h1 { font-size: 12pt; margin: 0; }
+    .fm-header p { font-size: 8pt; color: #6a7d5a; margin: 1px 0; }
+    .fm-num { text-align: center; font-family: monospace; font-size: 20pt; font-weight: bold; margin: 8px 0; }
+    .fm-info { font-size: 9pt; margin-bottom: 8px; }
+    .fm-info div { display: flex; justify-content: space-between; padding: 1px 0; }
+    .fm-sep { border-top: 1px dashed #ccc; margin: 8px 0; }
+    .fm-row { display: flex; justify-content: space-between; font-size: 9pt; padding: 3px 0; border-bottom: 1px dotted #eee; }
+    .fm-totales { margin-top: 8px; font-size: 10pt; }
+    .fm-totales div { display: flex; justify-content: space-between; padding: 2px 0; }
+    .fm-final { font-size: 13pt; font-weight: bold; color: #4b8523; border-top: 2px solid #1a3c63; margin-top: 4px; padding-top: 6px; }
+    .fm-saldo { color: #c0392b; }
+    .fm-nota { font-size: 8pt; color: #8a5a16; background: #fdf8ee; padding: 5px; border-radius: 4px; margin-top: 6px; }
+    .fm-footer { text-align: center; font-size: 7pt; color: #999; margin-top: 14px; }
+    .no-print { text-align: center; margin-top: 16px; }
+    .no-print button { background: #4b8523; color: #fff; border: none; padding: 10px 22px; border-radius: 8px; font-size: 13px; cursor: pointer; }
+    .no-print p { font-size: 11px; color: #666; margin-top: 8px; }
+    @media print { .no-print { display: none; } }
+  </style>
+  </head><body>
+    <div class="fm-header">
+      <img src="${logoUrl}" alt="" onerror="this.style.display='none'">
+      <h1>${NEGOCIO.nombre}</h1>
+      ${NEGOCIO.nit ? `<p>NIT: ${NEGOCIO.nit}</p>` : ''}
+      ${NEGOCIO.telefono ? `<p>Tel: ${NEGOCIO.telefono}</p>` : ''}
+    </div>
+
+    <div class="fm-num">${pedido.numero}</div>
+
+    <div class="fm-info">
+      <div><span>Cliente:</span><strong>${pedido.cliente}</strong></div>
+      <div><span>Fecha:</span><span>${fmtFecha(pedido.fecha)}</span></div>
+      <div><span>Estado:</span><span>${pedido.estado}</span></div>
+    </div>
+
+    <div class="fm-sep"></div>
+    ${filas}
+    <div class="fm-sep"></div>
+
+    <div class="fm-totales">
+      <div><span>Total pedido</span><span>${pendientePesaje ? fmtCOP(totalCam) + ' + pesaje' : fmtCOP(totalGeneral)}</span></div>
+      ${totalAbonado > 0 ? `<div><span>Abonado</span><span>${fmtCOP(totalAbonado)}</span></div>` : ''}
+      <div class="fm-final ${saldo > 0 ? 'fm-saldo' : ''}"><span>${saldo > 0 ? 'SALDO' : 'PAGADO'}</span><span>${saldo > 0 ? fmtCOP(saldo) : '✓'}</span></div>
+    </div>
+
+    ${pendientePesaje ? `<div class="fm-nota">⚖️ Incluye chaqueta pendiente de pesaje — el total puede cambiar.</div>` : ''}
+
+    <div class="fm-footer">Comprobante informativo, no tiene validez fiscal · ${new Date().toLocaleDateString('es-CO')}</div>
+
+    <div class="no-print">
+      <button onclick="window.print()">🖨 Imprimir</button>
+      <p>Tamaño de página: 10.5 x 15 cm — selecciona tu impresora Jadens y verifica que el papel esté en ese tamaño (o "4x6 in").</p>
     </div>
   </body></html>`)
   win.document.close()

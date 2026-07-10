@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { TIPO_LABEL, TIPO_ICON, fmtFecha, fmtCOP, calcProgreso, ESTADOS, ESTADO_ICON, TALLAS, TALLA_SIN_DIVIDIR, totalesPorTipoCam } from './constants'
-import { generarFacturaPDF, imprimirEtiqueta } from './factura'
+import { generarFacturaPDF, generarFacturaMini, imprimirEtiqueta } from './factura'
 import PanelPagos from './PanelPagos'
 import ColorSwatch from './ColorSwatch'
 import FormulaColorBoton from './FormulaColorBoton'
@@ -118,6 +118,11 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
           {pedidoCompleto && (
             <button className="btn btn-s" onClick={() => generarFacturaPDF(pedido)} style={{ background: 'var(--weave)', color: 'var(--thread)', fontWeight: 700 }}>
               🧾 Descargar Factura
+            </button>
+          )}
+          {pedidoCompleto && (
+            <button className="btn btn-s" onClick={() => generarFacturaMini(pedido)} style={{ background: 'var(--weave)', color: 'var(--thread)', fontWeight: 700 }} title="Recibo condensado 10.5x15cm para impresora térmica Jadens">
+              🧾 Factura mini (Jadens)
             </button>
           )}
           <button className="btn btn-p" onClick={onEditar}>✏️ Editar</button>
