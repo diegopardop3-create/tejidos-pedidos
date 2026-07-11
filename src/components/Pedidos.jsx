@@ -4,6 +4,7 @@ import NuevoPedido from './NuevoPedido'
 import ListaPedidos from './ListaPedidos'
 import Resumen from './Resumen'
 import ListaPrecios from './ListaPrecios'
+import BuscadorColores from './BuscadorColores'
 import DetalleModal from './DetalleModal'
 import ConfirmarEliminar from './ConfirmarEliminar'
 import logo from '../assets/logo.png'
@@ -97,6 +98,9 @@ export default function Pedidos({ session }) {
           <button className={`tab ${tab === 'precios' ? 'on' : ''}`} onClick={() => setTab('precios')}>
             🏷️ Precios
           </button>
+          <button className={`tab ${tab === 'colores' ? 'on' : ''}`} onClick={() => setTab('colores')}>
+            🎨 Colores
+          </button>
         </div>
 
         {tab === 'nuevo' && (
@@ -151,6 +155,8 @@ export default function Pedidos({ session }) {
         {tab === 'resumen' && <Resumen pedidos={pedidos} session={session} showToast={showToast} />}
 
         {tab === 'precios' && <ListaPrecios showToast={showToast} />}
+
+        {tab === 'colores' && <BuscadorColores />}
       </div>
 
       {detalleIdx !== null && (
