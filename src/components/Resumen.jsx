@@ -2,6 +2,13 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { MESES, TIPO_LABEL, fmtCOP } from './constants'
 
+// Reporte mensual: activado. Las 5 variables de entorno (SUPABASE_URL,
+// SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY, NOTIFICACION_EMAIL, CRON_SECRET)
+// ya están configuradas en Vercel, y la columna fecha_entregado ya existe en
+// la tabla pedidos. Si algún día hay que apagarlo temporalmente sin borrar
+// código, basta con volver esta bandera a false.
+const REPORTE_MENSUAL_ACTIVO = true
+
 export default function Resumen({ pedidos, session, showToast }) {
   const [abonos, setAbonos] = useState([]) // todos los abonos para calcular cartera
   const [enviando, setEnviando] = useState(false)
@@ -109,25 +116,27 @@ export default function Resumen({ pedidos, session, showToast }) {
 
   return (
     <div>
-      {/* Reporte mensual de pedidos entregados */}
-      <div className="card" style={{ background: 'var(--weave)', border: '1px solid var(--cbd)' }}>
-        <div className="ctitle">📊 Reporte de pedidos entregados</div>
-        <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
-          El día 1 de cada mes recibes automáticamente por correo el Excel del mes anterior.
-          También puedes pedir uno de un mes específico ahora mismo:
-        </p>
-        <div className="brow" style={{ alignItems: 'center' }}>
-          <select value={mesReporte} onChange={(e) => setMesReporte(Number(e.target.value))} style={{ padding: '8px 11px', border: '1px solid var(--border)', borderRadius: 7, fontSize: 13 }}>
-            {MESES.map((m, i) => <option key={m} value={i}>{m}</option>)}
-          </select>
-          <select value={anioReporte} onChange={(e) => setAnioReporte(Number(e.target.value))} style={{ padding: '8px 11px', border: '1px solid var(--border)', borderRadius: 7, fontSize: 13 }}>
-            {[anioReporte - 1, anioReporte].map((a) => <option key={a} value={a}>{a}</option>)}
-          </select>
-          <button className="btn btn-p" onClick={enviarReporteMes} disabled={enviando}>
-            {enviando ? 'Enviando…' : '📧 Enviar Excel de este mes por correo'}
-          </button>
+      {/* Reporte mensual de pedidos entregados — oculto hasta activar Resend + variables de entorno (ver TODO arriba) */}
+      {REPORTE_MENSUAL_ACTIVO && (
+        <div className="card" style={{ background: 'var(--weave)', border: '1px solid var(--cbd)' }}>
+          <div className="ctitle">📊 Reporte de pedidos entregados</div>
+          <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
+            El día 1 de cada mes recibes automáticamente por correo el Excel del mes anterior.
+            También puedes pedir uno de un mes específico ahora mismo:
+          </p>
+          <div className="brow" style={{ alignItems: 'center' }}>
+            <select value={mesReporte} onChange={(e) => setMesReporte(Number(e.target.value))} style={{ padding: '8px 11px', border: '1px solid var(--border)', borderRadius: 7, fontSize: 13 }}>
+              {MESES.map((m, i) => <option key={m} value={i}>{m}</option>)}
+            </select>
+            <select value={anioReporte} onChange={(e) => setAnioReporte(Number(e.target.value))} style={{ padding: '8px 11px', border: '1px solid var(--border)', borderRadius: 7, fontSize: 13 }}>
+              {[anioReporte - 1, anioReporte].map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+            <button className="btn btn-p" onClick={enviarReporteMes} disabled={enviando}>
+              {enviando ? 'Enviando…' : '📧 Enviar Excel de este mes por correo'}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Tarjetas principales */}
       <div className="rgrid">
