@@ -11,9 +11,16 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
   if (!pedido) return null
 
   const pr = calcProgreso(pedido)
+  const esSoloCamiseta = (pedido.items_camiseta || []).length > 0 && (pedido.items_chaqueta || []).length === 0
   const pedidoCompleto = pedido.estado === 'Entregado' ||
     (pr.total > 0 && pr.ok === pr.total) ||
-    (pr.total === 0 && (pedido.items_chaqueta || []).every((it) => it.kilos_reales != null))
+    (pr.total === 0 && (pedido.items_chaqueta || []).every((it) => it.kilos_reales != null)) ||
+    // Pedidos solo de camiseta: el precio ya se conoce sin pesar nada, así que
+    // el botón de factura puede aparecer desde que se marca "Listo", sin
+    // esperar a que se completen los ✅ de producción uno por uno. Los pedidos
+    // con chaqueta NO entran aquí porque su precio depende del peso, que
+    // normalmente se registra al entregar.
+    (esSoloCamiseta && pedido.estado === 'Listo')
 
   async function cambiarEstado(nuevoEstado) {
     const cambios = { estado: nuevoEstado, actualizado_en: new Date().toISOString() }
