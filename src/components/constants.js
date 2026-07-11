@@ -69,31 +69,66 @@ export function fmtCOP(valor) {
 // el nombre sea exacto — es de ayuda visual, no una fuente de verdad.
 const MAPA_COLORES = {
   negro: '#1a1a1a', blanco: '#ffffff', gris: '#9e9e9e', plomo: '#8c8c8c',
-  rojo: '#c0392b', vino: '#6d1b2f', rosado: '#e91e8c', rosa: '#e91e8c', fucsia: '#d6006d',
+  rojo: '#c0392b', vino: '#6d1b2f', vinotinto: '#6d1b2f', rosado: '#e91e8c', rosa: '#e91e8c', fucsia: '#d6006d',
   naranja: '#e67e22', mandarina: '#e67e22', amarillo: '#f1c40f', mostaza: '#c9a227',
   verde: '#2e7d32', oliva: '#6b7f3a', militar: '#556b2f', pino: '#1f4d3a', agua: '#3fae8a', menta: '#7fd8be',
-  turquesa: '#17a2b8', azul: '#1a3c63', rey: '#1e3a8a', cielo: '#7ec8e3', jean: '#4a6a8a', denim: '#4a6a8a',
-  morado: '#6a3fa0', uva: '#6a3fa0', lila: '#b57edc', purpura: '#6a3fa0',
-  cafe: '#6f4518', marron: '#6f4518', chocolate: '#4a2c14', camel: '#c19a6b',
+  jade: '#00a86b', botella: '#1b4d3e', esmeralda: '#0e9e6d',
+  turquesa: '#17a2b8', aguamarina: '#43c6ac', azul: '#1a3c63', rey: '#1e3a8a', cielo: '#7ec8e3', celeste: '#7ec8e3', jean: '#4a6a8a', denim: '#4a6a8a',
+  morado: '#6a3fa0', uva: '#6a3fa0', lila: '#b57edc', purpura: '#6a3fa0', lavanda: '#c9b6e4',
+  cafe: '#6f4518', marron: '#6f4518', chocolate: '#4a2c14', camel: '#c19a6b', ladrillo: '#9e4b32', ocre: '#cc8a2c', guayaba: '#e8836b',
   beige: '#e8dcc8', marfil: '#f3ecd8', crema: '#f5eedc', avena: '#d8c9a3', hueso: '#f2ecd9',
   dorado: '#c9a227', plateado: '#c0c0c0', coral: '#ff7f6b', salmon: '#fa8072',
+}
+
+// Palabras que MODIFICAN un color base en vez de reemplazarlo — por eso
+// "Azul bebé" ya no se ve igual que "Azul": se aclara/oscurece el hex del
+// color base según el modificador. El número es qué tanto se mezcla hacia
+// blanco (positivo) o hacia negro (negativo); 0.5 = a medio camino.
+const MODIFICADORES = {
+  bebe: 0.55, pastel: 0.5, palido: 0.5, clarito: 0.35, claro: 0.3,
+  perla: 0.4, oscuro: -0.35, oxford: -0.45, quemado: -0.3,
 }
 
 function normalizarTexto(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
 }
 
-// Busca el color más parecido para una palabra o frase (ej "Verde Oliva").
+// Mezcla un color hex hacia blanco (factor > 0) o hacia negro (factor < 0).
+function mezclarHex(hex, factor) {
+  const c = hex.replace('#', '')
+  const r = parseInt(c.substring(0, 2), 16), g = parseInt(c.substring(2, 4), 16), b = parseInt(c.substring(4, 6), 16)
+  const destino = factor >= 0 ? 255 : 0
+  const f = Math.abs(factor)
+  const mezclar = (canal) => Math.round(canal + (destino - canal) * f)
+  const aHex = (n) => n.toString(16).padStart(2, '0')
+  return `#${aHex(mezclar(r))}${aHex(mezclar(g))}${aHex(mezclar(b))}`
+}
+
+// Busca el color más parecido para una palabra o frase (ej "Verde Oliva",
+// "Azul bebé", "Rosado pastel"). Si la última palabra es un modificador
+// conocido (bebé, pastel, claro, oscuro...) y el resto de la frase es un
+// color base reconocido, se aclara/oscurece ese color en vez de ignorar
+// el modificador — así cada combinación se ve distinta, aunque no esté
+// escrita a mano en el diccionario.
 export function hexDeColor(palabra) {
   const n = normalizarTexto(palabra)
   if (!n) return null
   if (MAPA_COLORES[n]) return MAPA_COLORES[n]
   const partes = n.split(/\s+/)
+  if (partes.length > 1) {
+    const ultima = partes[partes.length - 1]
+    if (MODIFICADORES[ultima] !== undefined) {
+      const base = partes.slice(0, -1).join(' ')
+      const hexBase = MAPA_COLORES[base] || hexDeColor(base)
+      if (hexBase) return mezclarHex(hexBase, MODIFICADORES[ultima])
+    }
+  }
   for (let i = partes.length - 1; i >= 0; i--) {
     if (MAPA_COLORES[partes[i]]) return MAPA_COLORES[partes[i]]
   }
   return null
 }
+
 
 // Divide un nombre combinado ("Uva-Blanco", "Cafe-Negro-Rojo") en sus
 // segmentos, cada uno con su color aproximado para pintar la muestra.
