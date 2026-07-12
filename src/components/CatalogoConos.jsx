@@ -20,16 +20,25 @@ function tituloGama(g) {
   return g ? g.charAt(0).toUpperCase() + g.slice(1) : 'Sin gama'
 }
 
-// Genera el siguiente código libre tipo C-001, C-002... Nunca reutiliza
-// números: mira el número más alto que exista (incluidos los agotados) y
-// suma 1. Así un código jubilado jamás se le asigna a un cono nuevo.
-function siguienteCodigo(conos) {
+// El PREFIJO es la primera letra del nombre (Azul→A, Rosado→R, Camel→C).
+// La numeración es propia por letra: A-001, A-002... y aparte C-001, C-002...
+// El prefijo se congela al crear el cono (se guarda en la columna 'codigo'),
+// así que aunque después se edite el nombre, el código nunca cambia y el
+// historial de fórmulas nunca queda apuntando a un código inexistente.
+function letraDe(nombre) {
+  const prim = String(nombre || '').trim()
+  const m = prim.normalize('NFD').replace(/[\u0300-\u036f]/g, '').match(/[a-zA-Z]/)
+  return m ? m[0].toUpperCase() : 'X'
+}
+
+function siguienteCodigo(conos, nombre) {
+  const letra = letraDe(nombre)
   let max = 0
   for (const c of conos) {
-    const m = String(c.codigo || '').match(/C-(\d+)/i)
-    if (m) max = Math.max(max, parseInt(m[1], 10))
+    const m = String(c.codigo || '').match(/^([A-Z])-(\d+)$/i)
+    if (m && m[1].toUpperCase() === letra) max = Math.max(max, parseInt(m[2], 10))
   }
-  return `C-${String(max + 1).padStart(3, '0')}`
+  return `${letra}-${String(max + 1).padStart(3, '0')}`
 }
 
 export default function CatalogoConos({ showToast }) {
@@ -56,7 +65,7 @@ export default function CatalogoConos({ showToast }) {
     setCargando(false)
   }
 
-  const proximoCodigo = useMemo(() => siguienteCodigo(conos), [conos])
+  const proximoCodigo = useMemo(() => siguienteCodigo(conos, nuevoNombre), [conos, nuevoNombre])
 
   // Lista de gamas existentes, para el filtro de arriba.
   const gamas = useMemo(() => {
@@ -67,7 +76,7 @@ export default function CatalogoConos({ showToast }) {
   async function agregar() {
     if (!nuevoNombre.trim()) { showToast?.('⚠️', 'Escribe el nombre del color'); return }
     setGuardando(true)
-    const codigo = siguienteCodigo(conos)
+    const codigo = siguienteCodigo(conos, nuevoNombre)
     const { data, error } = await supabase.from('conos').insert({
       codigo, nombre: nuevoNombre.trim(), estado: nuevoEstado, nota: nuevaNota.trim() || null,
     }).select().single()
@@ -168,7 +177,7 @@ export default function CatalogoConos({ showToast }) {
       {/* Alta de color nuevo */}
       <div style={{ background: 'var(--weave)', borderRadius: 10, padding: 14, marginBottom: 18 }}>
         <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 10 }}>
-          Agregar color nuevo — próximo código: <span style={{ fontFamily: "'DM Mono', monospace", color: 'var(--thread)' }}>{proximoCodigo}</span>
+          Agregar color nuevo{nuevoNombre.trim() ? <> — próximo código: <span style={{ fontFamily: "'DM Mono', monospace", color: 'var(--thread)' }}>{proximoCodigo}</span></> : <span style={{ fontWeight: 400, color: 'var(--muted)' }}> — el código se genera con la primera letra del nombre (Azul→A, Rosado→R)</span>}
         </div>
         <div className="brow" style={{ flexWrap: 'wrap', gap: 10 }}>
           <div className="fld" style={{ flex: '2 1 180px', margin: 0 }}>
