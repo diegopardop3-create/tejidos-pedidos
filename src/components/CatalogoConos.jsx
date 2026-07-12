@@ -42,6 +42,10 @@ export default function CatalogoConos({ showToast }) {
   const [nuevoEstado, setNuevoEstado] = useState('rotacion')
   const [nuevaNota, setNuevaNota] = useState('')
   const [guardando, setGuardando] = useState(false)
+  const [editando, setEditando] = useState(null) // id del cono en edición
+  const [edNombre, setEdNombre] = useState('')
+  const [edEstado, setEdEstado] = useState('rotacion')
+  const [edNota, setEdNota] = useState('')
 
   useEffect(() => { cargar() }, [])
 
@@ -79,6 +83,54 @@ export default function CatalogoConos({ showToast }) {
     if (error) { showToast?.('⚠️', 'Error al cambiar estado'); return }
     setConos((prev) => prev.map((c) => (c.id === cono.id ? { ...c, estado: nuevo } : c)))
     showToast?.('✅', `${cono.codigo} → ${ESTADOS[nuevo].label}`)
+  }
+
+  function abrirEdicion(cono) {
+    setEditando(cono.id)
+    setEdNombre(cono.nombre || '')
+    setEdEstado(cono.estado || 'rotacion')
+    setEdNota(cono.nota || '')
+  }
+
+  async function guardarEdicion(cono) {
+    if (!edNombre.trim()) { showToast?.('⚠️', 'El nombre no puede quedar vacío'); return }
+    const { error } = await supabase.from('conos').update({
+      nombre: edNombre.trim(), estado: edEstado, nota: edNota.trim() || null, actualizado_en: new Date().toISOString(),
+    }).eq('id', cono.id)
+    if (error) { showToast?.('⚠️', 'Error al guardar los cambios'); return }
+    setConos((prev) => prev.map((c) => (c.id === cono.id ? { ...c, nombre: edNombre.trim(), estado: edEstado, nota: edNota.trim() || null } : c)))
+    setEditando(null)
+    showToast?.('✏️', `${cono.codigo} actualizado`)
+  }
+
+  // Revisa si el código está usado en alguna fórmula de color (Parte 2).
+  // Por ahora la tabla formulas_color no guarda códigos de cono, así que
+  // esto devuelve 0; queda listo para cuando conectemos fórmulas↔conos.
+  async function contarUsos(cono) {
+    try {
+      const { count } = await supabase
+        .from('formulas_color')
+        .select('id', { count: 'exact', head: true })
+        .ilike('descripcion', `%${cono.codigo}%`)
+      return count || 0
+    } catch {
+      return 0
+    }
+  }
+
+  async function borrar(cono) {
+    const usos = await contarUsos(cono)
+    let msg = `¿Borrar el color ${cono.codigo} (${cono.nombre})? Esto no se puede deshacer.`
+    if (usos > 0) {
+      msg = `⚠️ ATENCIÓN: el código ${cono.codigo} aparece en ${usos} fórmula(s) de color. ` +
+        `Si lo borras, esas fórmulas seguirán mencionando ${cono.codigo} pero ya no existirá en la carta. ` +
+        `¿Borrar de todas formas?`
+    }
+    if (!window.confirm(msg)) return
+    const { error } = await supabase.from('conos').delete().eq('id', cono.id)
+    if (error) { showToast?.('⚠️', 'Error al borrar'); return }
+    setConos((prev) => prev.filter((c) => c.id !== cono.id))
+    showToast?.('🗑️', `${cono.codigo} borrado`)
   }
 
   // Filtrado + agrupado por gama.
@@ -179,8 +231,40 @@ export default function CatalogoConos({ showToast }) {
               {grupo.items.map((c) => {
                 const est = ESTADOS[c.estado] || ESTADOS.rotacion
                 const agotado = c.estado === 'agotado'
+                if (editando === c.id) {
+                  return (
+                    <div key={c.id} style={{ background: 'var(--weave)', borderRadius: 8, padding: 12, marginBottom: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                        <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 800, color: 'var(--thread)', fontSize: 14 }}>{c.codigo}</span>
+                        <span style={{ fontSize: 11, color: 'var(--muted)' }}>editando…</span>
+                      </div>
+                      <div className="brow" style={{ flexWrap: 'wrap', gap: 10 }}>
+                        <div className="fld" style={{ flex: '2 1 180px', margin: 0 }}>
+                          <label>Nombre</label>
+                          <input type="text" value={edNombre} onChange={(e) => setEdNombre(e.target.value)} />
+                        </div>
+                        <div className="fld" style={{ flex: '1 1 140px', margin: 0 }}>
+                          <label>Estado</label>
+                          <select value={edEstado} onChange={(e) => setEdEstado(e.target.value)}>
+                            <option value="rotacion">Rotación</option>
+                            <option value="sin_rotacion">Sin rotación</option>
+                            <option value="agotado">Agotado</option>
+                          </select>
+                        </div>
+                        <div className="fld" style={{ flex: '2 1 180px', margin: 0 }}>
+                          <label>Nota</label>
+                          <input type="text" value={edNota} onChange={(e) => setEdNota(e.target.value)} />
+                        </div>
+                      </div>
+                      <div className="brow right" style={{ marginTop: 10 }}>
+                        <button className="btn btn-s btn-sm" onClick={() => setEditando(null)}>Cancelar</button>
+                        <button className="btn btn-p btn-sm" onClick={() => guardarEdicion(c)}>💾 Guardar</button>
+                      </div>
+                    </div>
+                  )
+                }
                 return (
-                  <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)', opacity: agotado ? 0.55 : 1 }}>
+                  <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border)', opacity: agotado ? 0.55 : 1 }}>
                     <ColorSwatch nombre={c.nombre} size={18} />
                     <div style={{ minWidth: 62 }}>
                       <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 800, color: 'var(--thread)', fontSize: 14 }}>{c.codigo}</span>
@@ -202,9 +286,9 @@ export default function CatalogoConos({ showToast }) {
                       <option value="sin_rotacion">Sin rotación</option>
                       <option value="agotado">Agotado</option>
                     </select>
-                    <button className="btn btn-s btn-sm" onClick={() => imprimirEtiquetaCono(c)} title="Imprimir etiqueta 2x1">
-                      🏷️ Etiqueta
-                    </button>
+                    <button className="btn btn-s btn-sm" onClick={() => abrirEdicion(c)} title="Editar">✏️</button>
+                    <button className="btn btn-s btn-sm" onClick={() => imprimirEtiquetaCono(c)} title="Imprimir etiqueta 2x1">🏷️</button>
+                    <button className="btn btn-s btn-sm" onClick={() => borrar(c)} title="Borrar" style={{ color: '#c0392b' }}>🗑️</button>
                   </div>
                 )
               })}
