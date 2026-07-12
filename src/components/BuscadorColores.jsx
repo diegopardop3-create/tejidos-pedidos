@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '../supabaseClient'
 import { fmtFecha, segmentosColor } from './constants'
 import ColorSwatch from './ColorSwatch'
+import CatalogoConos from './CatalogoConos'
 
 function normalizar(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
@@ -18,7 +19,8 @@ function normalizar(s) {
 // La búsqueda encaja tanto por palabra suelta ("camel" encuentra
 // "Camel-Negro" y "Camel-Blanco") como por combinación exacta
 // ("camel-negro").
-export default function BuscadorColores() {
+export default function BuscadorColores({ showToast }) {
+  const [seccion, setSeccion] = useState('buscar') // 'buscar' | 'conos'
   const [cargando, setCargando] = useState(true)
   const [indice, setIndice] = useState([]) // [{ colorNombre, segmentos:[...], pedidos:[{numero, fecha, id}] }]
   const [busqueda, setBusqueda] = useState('')
@@ -88,6 +90,20 @@ export default function BuscadorColores() {
   }, [busqueda, indice])
 
   return (
+    <>
+      {/* Sub-pestañas dentro de Colores: buscar color→pedido, o catálogo de conos */}
+      <div className="brow" style={{ gap: 8, marginBottom: 14 }}>
+        <button className={`btn ${seccion === 'buscar' ? 'btn-p' : 'btn-s'}`} onClick={() => setSeccion('buscar')}>
+          🔍 Buscar color → pedido
+        </button>
+        <button className={`btn ${seccion === 'conos' ? 'btn-p' : 'btn-s'}`} onClick={() => setSeccion('conos')}>
+          🎨 Carta de colores
+        </button>
+      </div>
+
+      {seccion === 'conos' ? (
+        <CatalogoConos showToast={showToast} />
+      ) : (
     <div className="card">
       <div className="ctitle">🎨 Buscador de colores</div>
       <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14 }}>
@@ -140,5 +156,7 @@ export default function BuscadorColores() {
         </div>
       )}
     </div>
+      )}
+    </>
   )
 }

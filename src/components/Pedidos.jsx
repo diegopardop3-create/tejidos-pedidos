@@ -156,7 +156,7 @@ export default function Pedidos({ session }) {
 
         {tab === 'precios' && <ListaPrecios showToast={showToast} />}
 
-        {tab === 'colores' && <BuscadorColores />}
+        {tab === 'colores' && <BuscadorColores showToast={showToast} />}
       </div>
 
       {detalleIdx !== null && (
