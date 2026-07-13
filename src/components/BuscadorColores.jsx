@@ -88,22 +88,9 @@ export default function BuscadorColores({ showToast }) {
     setCargando(false)
   }
 
-  // ¿El texto buscado parece un código de poliéster? (letra-guion-números)
-  const esCodigo = (s) => /^[a-zA-Z]-?\d+$/.test(s.replace(/\s+/g, ''))
-
   const resultados = useMemo(() => {
     const bruto = busqueda.trim()
     if (!bruto) return indice
-
-    // Si parece un código (A-003), filtra colores cuyas fórmulas usen ese código.
-    if (esCodigo(bruto)) {
-      const q = normalizar(bruto.replace(/\s+/g, ''))
-      return indice.filter((item) =>
-        (item.formulas || []).some((f) =>
-          (f.ingredientes || []).some((ing) => ing.tipo === 'poliester' && normalizar((ing.codigo || '').replace(/\s+/g, '')).includes(q))
-        )
-      )
-    }
 
     const tienGuion = bruto.includes('-')
     if (tienGuion) {
@@ -136,8 +123,7 @@ export default function BuscadorColores({ showToast }) {
       <div className="ctitle">🔍 Fórmula para la muestra</div>
       <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14 }}>
         Escribe un color (ej. <strong>camel</strong>) para ver en qué pedidos se usó y sus fórmulas
-        guardadas. También puedes buscar por código de poliéster (ej. <strong>A-003</strong>) para
-        encontrar en qué fórmulas se usó. Haz clic en una fórmula para ver la receta completa.
+        guardadas. Haz clic en una fórmula para ver la receta completa.
       </p>
 
       <div className="fld" style={{ marginBottom: 16 }}>
@@ -145,7 +131,7 @@ export default function BuscadorColores({ showToast }) {
           type="text"
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="🔍 Buscar color o código… (ej. camel, azul, A-003)"
+          placeholder="🔍 Buscar color… (ej. camel, azul, negro)"
           autoFocus
         />
       </div>
@@ -188,7 +174,7 @@ export default function BuscadorColores({ showToast }) {
                       onClick={() => setFormulaAbierta(f)}
                       style={{ background: 'var(--weave)', border: '1px solid var(--thread)', borderRadius: 7, padding: '4px 10px', cursor: 'pointer', fontSize: 12, color: 'var(--thread)', fontWeight: 700 }}
                     >
-                      🧪 {f.color_nombre}{f.etiqueta && f.etiqueta !== 'Sin nombre' ? ` · ${f.etiqueta}` : ''}
+                      🧪 {f.color_nombre}{f.descripcion ? ` · ${f.descripcion.slice(0, 24)}${f.descripcion.length > 24 ? '…' : ''}` : ''}
                     </button>
                   ))}
                 </div>
@@ -204,38 +190,13 @@ export default function BuscadorColores({ showToast }) {
       {formulaAbierta && (
         <div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) setFormulaAbierta(null) }}>
           <div className="modal" style={{ maxWidth: 420 }}>
-            <div className="mtitle">🧪 {formulaAbierta.color_nombre}{formulaAbierta.etiqueta && formulaAbierta.etiqueta !== 'Sin nombre' ? ` · ${formulaAbierta.etiqueta}` : ''}</div>
+            <div className="mtitle">🧪 {formulaAbierta.color_nombre}</div>
 
-            {Array.isArray(formulaAbierta.ingredientes) && formulaAbierta.ingredientes.length > 0 ? (
-              <div style={{ marginBottom: 14 }}>
-                {formulaAbierta.ingredientes.map((ing, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px', background: 'var(--ink)', borderRadius: 7, marginBottom: 6 }}>
-                    {ing.tipo === 'poliester' ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => { setFormulaAbierta(null); setSeccion('conos') }}
-                          title="Ver en la Carta de colores"
-                          style={{ fontFamily: "'DM Mono', monospace", fontWeight: 800, color: 'var(--thread)', fontSize: 13, background: 'none', border: '1px solid var(--thread)', borderRadius: 5, padding: '2px 7px', cursor: 'pointer' }}
-                        >
-                          {ing.codigo}
-                        </button>
-                        <span style={{ fontSize: 13, flex: 1 }}>{ing.nombre}</span>
-                      </>
-                    ) : (
-                      <span style={{ fontSize: 13, flex: 1 }}>🧵 {ing.texto}</span>
-                    )}
-                    {ing.cantidad && <span style={{ fontSize: 12, color: 'var(--muted)' }}>{ing.cantidad}</span>}
-                  </div>
-                ))}
+            {formulaAbierta.descripcion ? (
+              <div style={{ background: 'var(--weave)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
+                <p style={{ fontSize: 14, whiteSpace: 'pre-wrap', color: 'var(--ink)', margin: 0 }}>{formulaAbierta.descripcion}</p>
               </div>
-            ) : null}
-
-            {formulaAbierta.descripcion && (
-              <p style={{ fontSize: 13, whiteSpace: 'pre-wrap', marginBottom: 14, color: 'var(--muted)' }}>{formulaAbierta.descripcion}</p>
-            )}
-
-            {(!formulaAbierta.ingredientes || formulaAbierta.ingredientes.length === 0) && !formulaAbierta.descripcion && (
+            ) : (
               <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}>Esta fórmula no tiene receta guardada todavía.</p>
             )}
 
