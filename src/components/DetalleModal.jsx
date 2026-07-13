@@ -104,7 +104,7 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
           <div className="msec">
             <h4>👔 Camiseta — {pedido.items_camiseta.length} ítem(s)</h4>
             {pedido.items_camiseta.map((it) => (
-              <ItemCamView key={it.id} it={it} onToggle={toggleCelda} onImgClick={setLightbox} showToast={showToast} />
+              <ItemCamView key={it.id} it={it} onToggle={toggleCelda} onImgClick={setLightbox} showToast={showToast} pedidoId={pedido.id} />
             ))}
           </div>
         )}
@@ -113,7 +113,7 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
           <div className="msec">
             <h4>🧥 Chaqueta — {pedido.items_chaqueta.length} ítem(s)</h4>
             {pedido.items_chaqueta.map((it) => (
-              <ItemChaqView key={it.id} it={it} estadoPedido={pedido.estado} onToggle={toggleCelda} onPesaje={guardarPesaje} onImgClick={setLightbox} showToast={showToast} />
+              <ItemChaqView key={it.id} it={it} estadoPedido={pedido.estado} onToggle={toggleCelda} onPesaje={guardarPesaje} onImgClick={setLightbox} showToast={showToast} pedidoId={pedido.id} />
             ))}
           </div>
         )}
@@ -157,7 +157,7 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
   )
 }
 
-function ItemCamView({ it, onToggle, onImgClick, showToast }) {
+function ItemCamView({ it, onToggle, onImgClick, showToast, pedidoId }) {
   const tLabel = it.tipos.map((t) => `${TIPO_ICON[t]} ${TIPO_LABEL[t]}`).join(' + ')
   // Orden explícito guardado; si el ítem es viejo y no lo tiene, lo derivamos
   // como respaldo (Postgres no garantiza el orden de un objeto jsonb).
@@ -192,7 +192,7 @@ function ItemCamView({ it, onToggle, onImgClick, showToast }) {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
                     <ColorSwatch nombre={c} />
                     <span>{c}</span>
-                    <FormulaColorBoton nombreColor={c} showToast={showToast} pedidoId={pedido.id} />
+                    <FormulaColorBoton nombreColor={c} showToast={showToast} pedidoId={pedidoId} />
                   </div>
                 </th>
               ))}
@@ -276,7 +276,7 @@ function ItemCamView({ it, onToggle, onImgClick, showToast }) {
   )
 }
 
-function ItemChaqView({ it, estadoPedido, onToggle, onPesaje, onImgClick, showToast }) {
+function ItemChaqView({ it, estadoPedido, onToggle, onPesaje, onImgClick, showToast, pedidoId }) {
   const [kg, setKg] = useState(it.kilos_reales || '')
   const tLabel = it.tipos.map((t) => `${TIPO_ICON[t]} ${TIPO_LABEL[t]}`).join(' + ')
   const p0 = it.precios[it.tipos[0]] || 0
@@ -301,7 +301,7 @@ function ItemChaqView({ it, estadoPedido, onToggle, onPesaje, onImgClick, showTo
               let totF = 0
               return (
                 <tr key={color}>
-                  <td className="td-key chaq"><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><ColorSwatch nombre={color} /><span>{color}</span><FormulaColorBoton nombreColor={color} showToast={showToast} pedidoId={pedido.id} /></div></td>
+                  <td className="td-key chaq"><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><ColorSwatch nombre={color} /><span>{color}</span><FormulaColorBoton nombreColor={color} showToast={showToast} pedidoId={pedidoId} /></div></td>
                   {it.tipos.map((t) => {
                     const n = rowObj[t] || 0
                     if (!n) return <td key={t} style={{ textAlign: 'center', color: '#ccc' }}>—</td>
