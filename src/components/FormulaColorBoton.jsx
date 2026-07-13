@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { segmentosColor } from './constants'
+import EditorIngredientes from './EditorIngredientes'
 
 function normalizar(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
@@ -40,6 +41,7 @@ export default function FormulaColorBoton({ nombreColor, showToast }) {
         expandido: null, // id de la variante abierta, o 'nueva' para el formulario en blanco
         formEtiqueta: '',
         formDescripcion: '',
+        formIngredientes: [],
         guardando: false,
       }
     })
@@ -48,11 +50,11 @@ export default function FormulaColorBoton({ nombreColor, showToast }) {
   }
 
   function abrirNueva(idx) {
-    setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, expandido: 'nueva', formEtiqueta: '', formDescripcion: '' } : it)))
+    setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, expandido: 'nueva', formEtiqueta: '', formDescripcion: '', formIngredientes: [] } : it)))
   }
 
   function abrirVariante(idx, variante) {
-    setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, expandido: variante.id, formEtiqueta: variante.etiqueta || '', formDescripcion: variante.descripcion || '' } : it)))
+    setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, expandido: variante.id, formEtiqueta: variante.etiqueta || '', formDescripcion: variante.descripcion || '', formIngredientes: Array.isArray(variante.ingredientes) ? variante.ingredientes : [] } : it)))
   }
 
   function cerrarForm(idx) {
@@ -65,13 +67,14 @@ export default function FormulaColorBoton({ nombreColor, showToast }) {
 
   async function guardar(idx) {
     const it = items[idx]
-    if (!it.formDescripcion.trim()) { showToast?.('⚠️', 'Escribe la fórmula antes de guardar'); return }
+    const tieneIngredientes = (it.formIngredientes || []).length > 0
+    if (!it.formDescripcion.trim() && !tieneIngredientes) { showToast?.('⚠️', 'Agrega ingredientes o escribe la fórmula antes de guardar'); return }
     setItems((prev) => prev.map((x, i) => (i === idx ? { ...x, guardando: true } : x)))
 
     if (it.expandido === 'nueva') {
       const etiqueta = it.formEtiqueta.trim() || `Variante ${it.variantes.length + 1}`
       const { data, error } = await supabase.from('formulas_color').insert({
-        color_clave: it.clave, color_nombre: it.texto, etiqueta, descripcion: it.formDescripcion,
+        color_clave: it.clave, color_nombre: it.texto, etiqueta, descripcion: it.formDescripcion, ingredientes: it.formIngredientes || [],
       }).select().single()
       if (error) { showToast?.('⚠️', 'Error al guardar'); setItems((prev) => prev.map((x, i) => (i === idx ? { ...x, guardando: false } : x))); return }
       setItems((prev) => prev.map((x, i) => (i === idx ? { ...x, variantes: [...x.variantes, data], expandido: null, guardando: false } : x)))
@@ -79,12 +82,12 @@ export default function FormulaColorBoton({ nombreColor, showToast }) {
     } else {
       const etiqueta = it.formEtiqueta.trim() || 'Sin nombre'
       const { error } = await supabase.from('formulas_color').update({
-        etiqueta, descripcion: it.formDescripcion, color_nombre: it.texto, actualizado_en: new Date().toISOString(),
+        etiqueta, descripcion: it.formDescripcion, color_nombre: it.texto, ingredientes: it.formIngredientes || [], actualizado_en: new Date().toISOString(),
       }).eq('id', it.expandido)
       if (error) { showToast?.('⚠️', 'Error al guardar'); setItems((prev) => prev.map((x, i) => (i === idx ? { ...x, guardando: false } : x))); return }
       setItems((prev) => prev.map((x, i) => (i === idx ? {
         ...x,
-        variantes: x.variantes.map((v) => (v.id === it.expandido ? { ...v, etiqueta, descripcion: it.formDescripcion } : v)),
+        variantes: x.variantes.map((v) => (v.id === it.expandido ? { ...v, etiqueta, descripcion: it.formDescripcion, ingredientes: it.formIngredientes || [] } : v)),
         expandido: null, guardando: false,
       } : x)))
       showToast?.('🧪', `Variante de "${it.texto}" actualizada`)
@@ -148,9 +151,15 @@ export default function FormulaColorBoton({ nombreColor, showToast }) {
                             <textarea
                               value={it.formDescripcion}
                               onChange={(e) => actualizarCampo(idx, 'formDescripcion', e.target.value)}
-                              placeholder="Ej: 70% hilo negro + 30% poliéster blanco, 2 vueltas de..."
-                              style={{ minHeight: 70 }}
+                              placeholder="Notas adicionales (opcional)…"
+                              style={{ minHeight: 50 }}
                             />
+                          </div>
+                          <div style={{ marginTop: 10 }}>
+                            <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--muted)' }}>Ingredientes</label>
+                            <div style={{ marginTop: 6 }}>
+                              <EditorIngredientes valor={it.formIngredientes} onChange={(nuevo) => actualizarCampo(idx, 'formIngredientes', nuevo)} />
+                            </div>
                           </div>
                           <div className="brow right" style={{ marginTop: 8 }}>
                             <button className="btn btn-s btn-sm" onClick={() => eliminar(idx, v)} style={{ color: '#c0392b' }}>🗑️ Eliminar</button>
@@ -167,7 +176,11 @@ export default function FormulaColorBoton({ nombreColor, showToast }) {
                           style={{ width: '100%', textAlign: 'left', background: 'var(--ink)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', cursor: 'pointer' }}
                         >
                           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--thread)' }}>{v.etiqueta || 'Sin nombre'}</div>
-                          <div style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.descripcion}</div>
+                          <div style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {Array.isArray(v.ingredientes) && v.ingredientes.length > 0
+                              ? v.ingredientes.map((ing) => ing.tipo === 'poliester' ? ing.codigo : ing.texto).join(' + ')
+                              : v.descripcion}
+                          </div>
                         </button>
                       )}
                     </div>
@@ -189,9 +202,15 @@ export default function FormulaColorBoton({ nombreColor, showToast }) {
                         <textarea
                           value={it.formDescripcion}
                           onChange={(e) => actualizarCampo(idx, 'formDescripcion', e.target.value)}
-                          placeholder="Ej: 70% hilo negro + 30% poliéster blanco, 2 vueltas de..."
-                          style={{ minHeight: 70 }}
+                          placeholder="Notas adicionales (opcional)…"
+                          style={{ minHeight: 50 }}
                         />
+                      </div>
+                      <div style={{ marginTop: 10 }}>
+                        <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--muted)' }}>Ingredientes</label>
+                        <div style={{ marginTop: 6 }}>
+                          <EditorIngredientes valor={it.formIngredientes} onChange={(nuevo) => actualizarCampo(idx, 'formIngredientes', nuevo)} />
+                        </div>
                       </div>
                       <div className="brow right" style={{ marginTop: 8 }}>
                         <button className="btn btn-s btn-sm" onClick={() => cerrarForm(idx)}>Cancelar</button>
