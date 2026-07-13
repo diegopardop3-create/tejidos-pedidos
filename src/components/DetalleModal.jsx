@@ -192,7 +192,7 @@ function ItemCamView({ it, onToggle, onImgClick, showToast }) {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
                     <ColorSwatch nombre={c} />
                     <span>{c}</span>
-                    <FormulaColorBoton nombreColor={c} showToast={showToast} />
+                    <FormulaColorBoton nombreColor={c} showToast={showToast} pedidoId={pedido.id} />
                   </div>
                 </th>
               ))}
@@ -301,7 +301,7 @@ function ItemChaqView({ it, estadoPedido, onToggle, onPesaje, onImgClick, showTo
               let totF = 0
               return (
                 <tr key={color}>
-                  <td className="td-key chaq"><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><ColorSwatch nombre={color} /><span>{color}</span><FormulaColorBoton nombreColor={color} showToast={showToast} /></div></td>
+                  <td className="td-key chaq"><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><ColorSwatch nombre={color} /><span>{color}</span><FormulaColorBoton nombreColor={color} showToast={showToast} pedidoId={pedido.id} /></div></td>
                   {it.tipos.map((t) => {
                     const n = rowObj[t] || 0
                     if (!n) return <td key={t} style={{ textAlign: 'center', color: '#ccc' }}>—</td>

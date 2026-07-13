@@ -17,10 +17,12 @@ function normalizar(s) {
 //     usó ese color, para poder distinguirlas (ej. "Rosado bebe — P-0002").
 //   - Puedes ver/editar una existente o agregar una nueva. Nunca se
 //     sobreescriben las otras.
-export default function FormulaColorBoton({ nombreColor, showToast }) {
+export default function FormulaColorBoton({ nombreColor, showToast, pedidoId }) {
   const [abierto, setAbierto] = useState(false)
   const [cargando, setCargando] = useState(false)
   const [items, setItems] = useState([])
+  // Mapa clave-de-color -> formula_id seleccionada para ESTE pedido.
+  const [seleccion, setSeleccion] = useState({})
 
   async function abrir() {
     const segmentos = segmentosColor(nombreColor)
@@ -32,10 +34,19 @@ export default function FormulaColorBoton({ nombreColor, showToast }) {
 
     // Fórmulas guardadas de estos colores + todos los pedidos, para calcular
     // el pedido más reciente donde se usó cada nombre de color.
-    const [{ data: formulas }, { data: pedidos }] = await Promise.all([
+    // Si hay pedidoId, también cargamos qué fórmula está seleccionada para
+    // cada color en ESTE pedido.
+    const [{ data: formulas }, { data: pedidos }, seleccionRes] = await Promise.all([
       supabase.from('formulas_color').select('*').in('color_clave', claves),
       supabase.from('pedidos').select('numero, fecha, items_camiseta(colores), items_chaqueta(colores)').order('fecha', { ascending: false }),
+      pedidoId
+        ? supabase.from('pedido_color_formula').select('color_clave, formula_id').eq('pedido_id', pedidoId).in('color_clave', claves)
+        : Promise.resolve({ data: [] }),
     ])
+
+    const selMap = {}
+    for (const row of (seleccionRes?.data || [])) selMap[row.color_clave] = row.formula_id
+    setSeleccion(selMap)
 
     // Mapa: clave de color normalizada -> pedido más reciente donde aparece
     // (en cualquier segmento del color combinado del pedido).
@@ -119,6 +130,26 @@ export default function FormulaColorBoton({ nombreColor, showToast }) {
     }
   }
 
+  async function usarEsta(idx, variante) {
+    const it = items[idx]
+    if (!pedidoId) return
+    const yaEsta = seleccion[it.clave] === variante.id
+    if (yaEsta) {
+      // Deseleccionar: quitar la fila.
+      const { error } = await supabase.from('pedido_color_formula').delete().eq('pedido_id', pedidoId).eq('color_clave', it.clave)
+      if (error) { showToast?.('⚠️', 'Error al quitar la selección'); return }
+      setSeleccion((prev) => { const n = { ...prev }; delete n[it.clave]; return n })
+      showToast?.('↩️', `${it.texto}: fórmula quitada de este pedido`)
+      return
+    }
+    // Upsert: una sola fórmula por color en este pedido.
+    const { error } = await supabase.from('pedido_color_formula')
+      .upsert({ pedido_id: pedidoId, color_clave: it.clave, formula_id: variante.id }, { onConflict: 'pedido_id,color_clave' })
+    if (error) { showToast?.('⚠️', 'Error al seleccionar la fórmula'); return }
+    setSeleccion((prev) => ({ ...prev, [it.clave]: variante.id }))
+    showToast?.('✅', `${it.texto}: fórmula seleccionada para este pedido`)
+  }
+
   async function eliminar(idx, variante) {
     if (!window.confirm(`¿Eliminar esta fórmula de "${items[idx].texto}"? Esto no se puede deshacer.`)) return
     const { error } = await supabase.from('formulas_color').delete().eq('id', variante.id)
@@ -184,13 +215,27 @@ export default function FormulaColorBoton({ nombreColor, showToast }) {
                           </div>
                         </div>
                       ) : (
-                        <button
-                          type="button"
-                          onClick={() => abrirVariante(idx, v)}
-                          style={{ width: '100%', textAlign: 'left', background: 'var(--weave)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', cursor: 'pointer' }}
-                        >
-                          <div style={{ fontSize: 13, color: 'var(--ink)', whiteSpace: 'pre-wrap' }}>{v.descripcion}</div>
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'stretch', gap: 6 }}>
+                          <button
+                            type="button"
+                            onClick={() => abrirVariante(idx, v)}
+                            style={{ flex: 1, textAlign: 'left', background: seleccion[it.clave] === v.id ? '#eaf5ea' : 'var(--weave)', border: seleccion[it.clave] === v.id ? '1.5px solid var(--thread)' : '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', cursor: 'pointer' }}
+                          >
+                            {seleccion[it.clave] === v.id && <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--thread)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 3 }}>✓ Usada en este pedido</div>}
+                            <div style={{ fontSize: 13, color: 'var(--ink)', whiteSpace: 'pre-wrap' }}>{v.descripcion}</div>
+                          </button>
+                          {pedidoId && (
+                            <button
+                              type="button"
+                              onClick={() => usarEsta(idx, v)}
+                              className="btn btn-sm"
+                              style={{ flexShrink: 0, alignSelf: 'center', background: seleccion[it.clave] === v.id ? 'var(--thread)' : 'var(--weave)', color: seleccion[it.clave] === v.id ? '#fff' : 'var(--thread)', border: '1px solid var(--thread)' }}
+                              title={seleccion[it.clave] === v.id ? 'Quitar de este pedido' : 'Usar esta fórmula en este pedido'}
+                            >
+                              {seleccion[it.clave] === v.id ? '✓ Usada' : 'Usar esta'}
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   ))}
