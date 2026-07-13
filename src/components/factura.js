@@ -154,15 +154,16 @@ export function imprimirEtiqueta(pedido) {
       font-family: Arial, Helvetica, sans-serif;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      padding: 1.5mm 2.5mm;
+      padding: 2.5mm 2.5mm;
       background: #fff;
       margin: 8mm auto;
       box-shadow: 0 2px 10px rgba(0,0,0,.15);
+      overflow: hidden;
     }
-    .marca { font-size: 5pt; letter-spacing: 0.12em; color: #6a7d5a; text-transform: uppercase; margin-bottom: 1mm; font-weight: 600; }
-    .linea { width: 100%; border-top: 0.3mm solid #4b8523; margin-bottom: 1mm; }
-    .numero { font-size: 18pt; font-weight: 900; color: #1a3c63; letter-spacing: 0.02em; line-height: 1; margin-bottom: 1mm; }
-    .cliente { font-size: 7pt; font-weight: 700; color: #1a3c63; text-align: center; line-height: 1.2; max-width: 46mm; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .marca { font-size: 4.5pt; letter-spacing: 0.1em; color: #6a7d5a; text-transform: uppercase; margin-bottom: 0.8mm; font-weight: 600; text-align: center; }
+    .linea { width: 100%; border-top: 0.3mm solid #4b8523; margin-bottom: 0.8mm; }
+    .numero { font-size: 16pt; font-weight: 900; color: #1a3c63; letter-spacing: 0.02em; line-height: 1; margin-bottom: 0.8mm; }
+    .cliente { font-size: 6.5pt; font-weight: 700; color: #1a3c63; text-align: center; line-height: 1.15; max-width: 45mm; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .no-print { text-align: center; margin-top: 14px; }
     .no-print button {
       background: #4b8523; color: #fff; border: none; padding: 12px 28px;
