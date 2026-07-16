@@ -9,6 +9,18 @@ export const TALLA_SIN_DIVIDIR = 'Todas (sin dividir)'
 export const TALLAS = ['2', '4', '2-4', '6', '8', '6-8', '10', '12', '10-12', '14', '16', '14-16', 'S', 'M', 'L', 'XL', '2XL', '3XL']
 export const TIPO_LABEL = { puno: 'Puño', cuello: 'Cuello', pretina: 'Pretina' }
 export const TIPO_ICON = { puno: '🧤', cuello: '🔵', pretina: '📏' }
+
+// Orden fijo en que deben salir SIEMPRE los tipos, sin importar en qué
+// orden se hayan marcado los checkbox al crear el pedido. Antes el orden
+// dependía del clic, así que un pedido salía "Cuello | Puño" y otro
+// "Puño | Cuello" — se ordena al guardar para que las columnas de la tabla,
+// la factura y la vista del cliente queden siempre iguales.
+export const ORDEN_TIPOS = ['pretina', 'cuello', 'puno']
+export function ordenarTipos(tipos) {
+  return [...(tipos || [])].sort(
+    (a, b) => ORDEN_TIPOS.indexOf(a) - ORDEN_TIPOS.indexOf(b)
+  )
+}
 export const MESES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
