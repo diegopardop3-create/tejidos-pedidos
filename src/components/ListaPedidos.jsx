@@ -1,8 +1,56 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { TIPO_LABEL, TIPO_ICON, fmtFecha, fmtCOP, calcProgreso, ESTADOS, ESTADO_ICON, ESTADO_DOT, PAGO_COLOR, PAGO_ICON } from './constants'
+import { TIPO_LABEL, TIPO_ICON, fmtCOP, calcProgreso, totalesPorTipoCam, ESTADOS, ESTADO_ICON, ESTADO_DOT, PAGO_COLOR, PAGO_ICON } from './constants'
 import { imprimirEtiqueta } from './factura'
 import PanelPagos from './PanelPagos'
+
+// ============================================
+// RESUMEN DE UNIDADES POR PEDIDO
+// ============================================
+// Se muestra junto a los ítems en la lista, para saber de un vistazo el
+// tamaño del pedido sin tener que abrirlo. Reglas del negocio:
+//  - Si el ítem de camiseta tiene precio de "juego", se cuenta por CUELLOS
+//    (los puños van incluidos y no se cobran aparte) -> "632 juegos".
+//  - Si cuello y puño tienen precios separados, se muestran los dos
+//    números por aparte -> "632 cuellos · 345 puños".
+//  - La chaqueta se cobra por kilo (se pesa al entregar), pero igual se
+//    muestran sus unidades por tipo -> "40 pretinas · 20 cuellos".
+// Camiseta y chaqueta se muestran en líneas separadas para que un "cuello"
+// de camiseta nunca se confunda con uno de chaqueta.
+function plural(n, sing, plu) {
+  return `${n} ${n === 1 ? sing : plu}`
+}
+
+function unidadesCamiseta(items) {
+  let juegos = 0, cuellos = 0, punos = 0
+  for (const it of (items || [])) {
+    const { cuello, puno } = totalesPorTipoCam(it.tabla)
+    if (it.precios?.juego) juegos += cuello
+    else { cuellos += cuello; punos += puno }
+  }
+  const partes = []
+  if (juegos > 0) partes.push(plural(juegos, 'juego', 'juegos'))
+  if (cuellos > 0) partes.push(plural(cuellos, 'cuello', 'cuellos'))
+  if (punos > 0) partes.push(plural(punos, 'puño', 'puños'))
+  return partes.join(' · ')
+}
+
+function unidadesChaqueta(items) {
+  let pretina = 0, cuello = 0, puno = 0
+  for (const it of (items || [])) {
+    // En chaqueta la tabla va por color (sin tallas): tabla[color][tipo]
+    Object.values(it.tabla || {}).forEach((rObj) => {
+      pretina += rObj.pretina || 0
+      cuello += rObj.cuello || 0
+      puno += rObj.puno || 0
+    })
+  }
+  const partes = []
+  if (pretina > 0) partes.push(plural(pretina, 'pretina', 'pretinas'))
+  if (cuello > 0) partes.push(plural(cuello, 'cuello', 'cuellos'))
+  if (puno > 0) partes.push(plural(puno, 'puño', 'puños'))
+  return partes.join(' · ')
+}
 
 export default function ListaPedidos({ pedidos, loading, onVerDetalle, onEliminar, onCompartir, showToast, refrescar, titulo = 'Pedidos', soloEntregados = false }) {
   const [busqueda, setBusqueda] = useState('')
@@ -87,15 +135,15 @@ export default function ListaPedidos({ pedidos, loading, onVerDetalle, onElimina
         <table>
           <thead>
             <tr>
-              <th>N°</th><th>Fecha</th><th>Cliente</th><th>Ítems</th>
+              <th>N°</th><th>Cliente</th><th>Ítems</th>
               <th>Progreso</th><th>Total</th><th>Pago</th><th>Estado</th><th></th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={9}><div className="empty"><div className="empty-ico">⏳</div><p>Cargando…</p></div></td></tr>
+              <tr><td colSpan={8}><div className="empty"><div className="empty-ico">⏳</div><p>Cargando…</p></div></td></tr>
             ) : !filtrados.length ? (
-              <tr><td colSpan={9}><div className="empty"><div className="empty-ico">🧵</div>
+              <tr><td colSpan={8}><div className="empty"><div className="empty-ico">🧵</div>
                 <p>{busqueda || filEstado ? 'Sin resultados' : soloEntregados ? 'Aún no hay pedidos entregados' : 'Sin pedidos activos'}</p>
               </div></td></tr>
             ) : (
@@ -104,6 +152,8 @@ export default function ListaPedidos({ pedidos, loading, onVerDetalle, onElimina
                 const tipsCam = [...new Set((p.items_camiseta || []).flatMap((it) => it.tipos || []))].map((t) => TIPO_ICON[t] + TIPO_LABEL[t])
                 const tipsChaq = [...new Set((p.items_chaqueta || []).flatMap((it) => it.tipos || []))].map((t) => TIPO_ICON[t] + TIPO_LABEL[t])
                 const ni = (p.items_camiseta || []).length + (p.items_chaqueta || []).length
+                const unidCam = unidadesCamiseta(p.items_camiseta)
+                const unidChaq = unidadesChaqueta(p.items_chaqueta)
                 // Calcular total real: camiseta + chaqueta pesada
                 const totCam = p.total_camiseta || 0
                 const itemsChaq = p.items_chaqueta || []
@@ -126,13 +176,22 @@ export default function ListaPedidos({ pedidos, loading, onVerDetalle, onElimina
                   <>
                     <tr key={p.id} style={{ borderBottom: pagoAberto ? 'none' : undefined }}>
                       <td onClick={() => onVerDetalle(idx)} style={{ cursor: 'pointer' }}><span className="td-nlbl">{p.numero}</span></td>
-                      <td onClick={() => onVerDetalle(idx)} className="td-mono" style={{ cursor: 'pointer' }}>{fmtFecha(p.fecha)}</td>
                       <td onClick={() => onVerDetalle(idx)} style={{ fontWeight: 600, cursor: 'pointer' }}>{p.cliente}</td>
-                      <td onClick={() => onVerDetalle(idx)} style={{ cursor: 'pointer' }}>
-                        {tipsCam.length > 0 && <span className="badge cam" style={{ marginRight: 3 }}>👔 {tipsCam.join(' · ')}</span>}
-                        {tipsChaq.length > 0 && <span className="badge chaq">🧥 {tipsChaq.join(' · ')}</span>}
+                      <td onClick={() => onVerDetalle(idx)} style={{ cursor: 'pointer', minWidth: 150 }}>
+                        {tipsCam.length > 0 && (
+                          <div style={{ marginBottom: tipsChaq.length > 0 ? 5 : 0 }}>
+                            <span className="badge cam">👔 {tipsCam.join(' · ')}</span>
+                            {unidCam && <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--thread)', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>{unidCam}</div>}
+                          </div>
+                        )}
+                        {tipsChaq.length > 0 && (
+                          <div>
+                            <span className="badge chaq">🧥 {tipsChaq.join(' · ')}</span>
+                            {unidChaq && <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--yarn)', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>{unidChaq}</div>}
+                          </div>
+                        )}
                         {!tipsCam.length && !tipsChaq.length && '—'}
-                        <span style={{ fontSize: 10, color: 'var(--muted)', marginLeft: 4 }}>({ni})</span>
+                        {ni > 1 && <span style={{ fontSize: 10, color: 'var(--muted)' }}>({ni} ítems)</span>}
                       </td>
                       <td onClick={() => onVerDetalle(idx)} style={{ minWidth: 120, cursor: 'pointer' }}>
                         {pr.total > 0 ? (
@@ -178,7 +237,7 @@ export default function ListaPedidos({ pedidos, loading, onVerDetalle, onElimina
                     </tr>
                     {pagoAberto && (
                       <tr key={p.id + '-pago'}>
-                        <td colSpan={9} style={{ padding: '0 14px 12px', background: 'var(--loom)' }}>
+                        <td colSpan={8} style={{ padding: '0 14px 12px', background: 'var(--loom)' }}>
                           <PanelPagos
                             pedido={p}
                             onUpdated={refrescar}
