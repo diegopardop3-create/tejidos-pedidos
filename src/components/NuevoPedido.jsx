@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
-import { TALLAS, TALLA_SIN_DIVIDIR, TIPO_LABEL, TIPO_ICON, hoy, ESTADOS, ESTADO_ICON, fmtCOP, totalesPorTipoCam } from './constants'
+import { TALLAS, TALLA_SIN_DIVIDIR, TIPO_LABEL, TIPO_ICON, hoy, ESTADOS, ESTADO_ICON, fmtCOP, totalesPorTipoCam, ordenarTipos } from './constants'
 import ColorSwatch from './ColorSwatch'
 import FormulaColorBoton from './FormulaColorBoton'
 
@@ -118,7 +118,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
   function camAddCol() { setCamCols((c) => [...c, { principal: '', rayas: [] }]) }
   function camDelCol(ci) {
     if (camCols.length <= 1) { showToast('⚠️', 'Debe haber al menos un color'); return }
-    const tipos = [...camSelTipos]
+    const tipos = ordenarTipos([...camSelTipos])
     setCamCols((cols) => cols.filter((_, i) => i !== ci))
     setCamCants((prev) => {
       const n = {}
@@ -175,7 +175,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
   }
 
   function guardarItemCam() {
-    const tipos = [...camSelTipos]
+    const tipos = ordenarTipos([...camSelTipos])
     if (!tipos.length) { showToast('⚠️', 'Selecciona Puño y/o Cuello'); return }
     if (!camTallasSel.size) { showToast('⚠️', 'Selecciona al menos una talla'); return }
     const cols = camCols.map((c, ci) => ({ nombre: nombreColor(c, ci), ci }))
@@ -289,7 +289,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
   }
 
   function guardarItemChaq() {
-    const tipos = [...chaqSelTipos]
+    const tipos = ordenarTipos([...chaqSelTipos])
     if (!tipos.length) { showToast('⚠️', 'Selecciona Pretina, Cuello y/o Puño'); return }
     const rows = chaqRows.map((c, ri) => ({ nombre: nombreColor(c, ri), ri }))
     const tabla = {}
@@ -461,7 +461,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
 
           {camSelTipos.size > 0 && (
             <FormularioCam
-              tipos={[...camSelTipos]}
+              tipos={ordenarTipos([...camSelTipos])}
               cols={camCols} cants={camCants} diseno={camDiseno} precios={camPrecios} imgs={camImgs}
               setDiseno={setCamDiseno} setPrecios={setCamPrecios}
               setV={camSetV} addCol={camAddCol} delCol={camDelCol}
@@ -511,7 +511,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
 
           {chaqSelTipos.size > 0 && (
             <FormularioChaq
-              tipos={[...chaqSelTipos]}
+              tipos={ordenarTipos([...chaqSelTipos])}
               rows={chaqRows} cants={chaqCants} diseno={chaqDiseno} precios={chaqPrecios} imgs={chaqImgs}
               setDiseno={setChaqDiseno} setPrecios={setChaqPrecios}
               setV={chaqSetV} addRow={chaqAddRow} delRow={chaqDelRow}
