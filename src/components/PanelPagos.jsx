@@ -19,6 +19,9 @@ export default function PanelPagos({ pedido, onUpdated, showToast, compact = fal
   const itemsChaq = pedido.items_chaqueta || []
   const totChaqPesada = itemsChaq.reduce((s, it) => s + (it.total_final || 0), 0)
   const totalPedido = totCam + totChaqPesada
+  // Si falta pesar alguna chaqueta, el total mostrado todavía no es el
+  // definitivo — se avisa para que no se cobre de menos por error.
+  const hayChaqPendiente = itemsChaq.some((it) => it.kilos_reales == null)
 
   useEffect(() => { cargarAbonos() }, [pedido.id])
 
@@ -120,6 +123,20 @@ export default function PanelPagos({ pedido, onUpdated, showToast, compact = fal
       background: estadoPago === 'Pagado' ? '#f1f6ec' : estadoPago === 'Parcial' ? '#fffbf0' : '#fdf8ee',
       overflow: 'hidden', marginTop: compact ? 0 : 12,
     }}>
+      {/* Total del pedido — arriba del todo, porque la lista ya no muestra
+          la columna Total: este panel es donde se consulta el valor. */}
+      {totalPedido > 0 && (
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, padding: '10px 14px 0' }}>
+          <span style={{ fontSize: 10, color: '#6a7d5a', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '.06em' }}>
+            Total del pedido
+          </span>
+          <span style={{ fontSize: 17, fontWeight: 800, color: 'var(--ink)', fontFamily: "'DM Mono', monospace" }}>
+            {fmtCOP(totalPedido)}
+            {hayChaqPendiente && <span style={{ fontSize: 10, color: 'var(--warn)', marginLeft: 5, fontWeight: 700 }}>+⚖️ falta pesar</span>}
+          </span>
+        </div>
+      )}
+
       {/* Cabecera */}
       <div
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', cursor: compact ? 'pointer' : 'default', gap: 10 }}
