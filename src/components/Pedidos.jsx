@@ -36,7 +36,17 @@ export default function Pedidos({ session }) {
       setLoading(false)
       return
     }
-    setPedidos(pedidosData || [])
+    // Los abonos se traen en una consulta aparte (no anidada) y se suman por
+    // pedido. Así la lista puede pintar la barra de % pagado sin tener que
+    // abrir el panel de pagos. Si esta consulta falla, los pedidos igual se
+    // muestran — solo quedarían sin barra, no se cae la pantalla.
+    const { data: abonosData } = await supabase.from('abonos').select('pedido_id, monto')
+    const abonadoPorPedido = {}
+    for (const a of (abonosData || [])) {
+      abonadoPorPedido[a.pedido_id] = (abonadoPorPedido[a.pedido_id] || 0) + (a.monto || 0)
+    }
+
+    setPedidos((pedidosData || []).map((p) => ({ ...p, total_abonado: abonadoPorPedido[p.id] || 0 })))
     setLoading(false)
   }, [showToast])
 
