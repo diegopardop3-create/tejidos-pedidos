@@ -135,8 +135,8 @@ export default function ListaPedidos({ pedidos, loading, onVerDetalle, onElimina
         <table>
           <thead>
             <tr>
-              <th>N°</th><th>Cliente</th><th>Ítems</th>
-              <th>Progreso</th><th>Total</th><th>Pago</th><th>Estado</th><th></th>
+              <th>N°</th><th>Cliente</th><th>Observaciones</th><th>Ítems</th>
+              <th>Progreso</th><th>Pago</th><th>Estado</th><th></th>
             </tr>
           </thead>
           <tbody>
@@ -157,16 +157,15 @@ export default function ListaPedidos({ pedidos, loading, onVerDetalle, onElimina
                 // Calcular total real: camiseta + chaqueta pesada
                 const totCam = p.total_camiseta || 0
                 const itemsChaq = p.items_chaqueta || []
-                const todosChaqPesados = itemsChaq.length > 0 && itemsChaq.every(it => it.kilos_reales != null)
                 const algunChaqPendiente = itemsChaq.some(it => it.kilos_reales == null)
                 const totChaqPesada = itemsChaq.reduce((s, it) => s + (it.total_final || 0), 0)
                 const totalReal = totCam + totChaqPesada
 
-                const totStr = itemsChaq.length === 0
-                  ? <span className="td-p">{fmtCOP(totCam)}</span>
-                  : algunChaqPendiente
-                  ? <><span className="td-p">{fmtCOP(totalReal)}</span><span style={{ fontSize: 10, color: 'var(--warn)', marginLeft: 4 }}>+⚖️</span></>
-                  : <span className="td-p">{fmtCOP(totalReal)}</span>
+                // % pagado, con el total abonado que adjunta Pedidos.jsx.
+                // Si el pedido tiene chaqueta sin pesar, el total todavía no
+                // es el definitivo — por eso se avisa con ⚖️ junto a la barra.
+                const abonado = p.total_abonado || 0
+                const pctPago = totalReal > 0 ? Math.min(100, Math.round((abonado / totalReal) * 100)) : 0
                 const pr = calcProgreso(p)
                 const estadoPago = p.estado_pago || 'Pendiente'
                 const colorPago = PAGO_COLOR[estadoPago]
@@ -177,6 +176,19 @@ export default function ListaPedidos({ pedidos, loading, onVerDetalle, onElimina
                     <tr key={p.id} style={{ borderBottom: pagoAberto ? 'none' : undefined }}>
                       <td onClick={() => onVerDetalle(idx)} style={{ cursor: 'pointer' }}><span className="td-nlbl">{p.numero}</span></td>
                       <td onClick={() => onVerDetalle(idx)} style={{ fontWeight: 600, cursor: 'pointer' }}>{p.cliente}</td>
+                      <td
+                        onClick={() => onVerDetalle(idx)}
+                        title={p.observaciones || ''}
+                        style={{
+                          cursor: 'pointer', fontSize: 12, color: 'var(--muted)',
+                          // Tope de ancho: si la nota es larga se corta con "…"
+                          // (el texto completo queda en el tooltip) para que no
+                          // se estire la columna y descuadre el resto de la tabla.
+                          maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {p.observaciones || <span style={{ color: 'var(--border)' }}>—</span>}
+                      </td>
                       <td onClick={() => onVerDetalle(idx)} style={{ cursor: 'pointer', minWidth: 150 }}>
                         {tipsCam.length > 0 && (
                           <div style={{ marginBottom: tipsChaq.length > 0 ? 5 : 0 }}>
@@ -203,7 +215,6 @@ export default function ListaPedidos({ pedidos, loading, onVerDetalle, onElimina
                           </>
                         ) : <span style={{ fontSize: 11, color: 'var(--muted)' }}>—</span>}
                       </td>
-                      <td onClick={() => onVerDetalle(idx)} style={{ cursor: 'pointer' }}>{totStr}</td>
                       <td onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => setAbiertoPago(pagoAberto ? null : p.id)}
@@ -216,6 +227,15 @@ export default function ListaPedidos({ pedidos, loading, onVerDetalle, onElimina
                         >
                           {PAGO_ICON[estadoPago]} {estadoPago}
                         </button>
+                        {totalReal > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 }}>
+                            <div style={{ width: 54, height: 5, background: '#e0e0e0', borderRadius: 20, overflow: 'hidden', flexShrink: 0 }}>
+                              <div style={{ width: `${pctPago}%`, height: '100%', background: colorPago, borderRadius: 20, transition: 'width .3s' }} />
+                            </div>
+                            <span style={{ fontSize: 10, fontFamily: "'DM Mono', monospace", color: colorPago, fontWeight: 700 }}>{pctPago}%</span>
+                            {algunChaqPendiente && <span style={{ fontSize: 10, color: 'var(--warn)' }} title="Falta pesar la chaqueta: el total aún no es el definitivo">⚖️</span>}
+                          </div>
+                        )}
                       </td>
                       <td onClick={(e) => e.stopPropagation()}>
                         <select
