@@ -301,7 +301,7 @@ function ItemChaqView({ it, estadoPedido, onToggle, onPesaje, onImgClick, showTo
               let totF = 0
               return (
                 <tr key={color}>
-                  <td className="td-key chaq"><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><ColorSwatch nombre={color} /><span>{color}</span><FormulaColorBoton nombreColor={color} showToast={showToast} pedidoId={pedidoId} /></div></td>
+                 <td className="td-key chaq"><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><ColorSwatch nombre={color} /><span>{color}</span><FormulaColorBoton nombreColor={color} showToast={showToast} pedidoId={pedidoId} itemTipo="chaqueta" itemId={it.id} /></div></td>
                   {it.tipos.map((t) => {
                     const n = rowObj[t] || 0
                     if (!n) return <td key={t} style={{ textAlign: 'center', color: '#ccc' }}>—</td>
