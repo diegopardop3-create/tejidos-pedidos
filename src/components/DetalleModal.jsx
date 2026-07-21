@@ -192,7 +192,7 @@ function ItemCamView({ it, onToggle, onImgClick, showToast, pedidoId }) {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
                     <ColorSwatch nombre={c} />
                     <span>{c}</span>
-                    <FormulaColorBoton nombreColor={c} showToast={showToast} pedidoId={pedidoId} />
+                   <FormulaColorBoton nombreColor={c} showToast={showToast} pedidoId={pedidoId} itemTipo="camiseta" itemId={it.id} />
                   </div>
                 </th>
               ))}
