@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { segmentosColor } from './constants'
+import { segmentosColor, gamaDe } from './constants'
 
 function normalizar(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
@@ -9,20 +9,25 @@ function normalizar(s) {
 // Botón (🧪) que abre las FÓRMULAS de cada color que compone el nombre.
 // Ej: "Rosado bebe-Negro" se maneja como dos colores: "Rosado bebe" y "Negro".
 //
-// Diseño (simplificado a pedido del usuario):
+// Diseño:
 //   - Una fórmula = etiqueta (automática: el nombre del color) + receta en
-//     texto libre. Sin ingredientes estructurados ni sección de hilo.
-//   - Un mismo color puede tener varias fórmulas (varios tonos). Se listan
-//     todas, y cada una muestra la receta + el pedido MÁS RECIENTE donde se
-//     usó ese color, para poder distinguirlas (ej. "Rosado bebe — P-0002").
-//   - Puedes ver/editar una existente o agregar una nueva. Nunca se
-//     sobreescriben las otras.
-export default function FormulaColorBoton({ nombreColor, showToast, pedidoId }) {
+//     texto libre.
+//   - Al elegir cuál usar, se muestran TODAS las variantes de la misma GAMA
+//     (ej. "Azul", "Azul oscuro", "Azul petroleo", "Azul día" son todas de
+//     la gama "azul"), cada una etiquetada con su nombre original, para que
+//     puedas comparar tonos aunque no se llamen exactamente igual.
+//   - La selección de "cuál fórmula se usa en este pedido" se ancla al
+//     ÍTEM y a la COLUMNA de color exacta (no solo al texto), para que dos
+//     colores escritos igual en el mismo pedido (ej. dos veces "Azul") NUNCA
+//     compartan la misma selección por accidente.
+export default function FormulaColorBoton({ nombreColor, showToast, pedidoId, itemTipo, itemId }) {
   const [abierto, setAbierto] = useState(false)
   const [cargando, setCargando] = useState(false)
   const [items, setItems] = useState([])
-  // Mapa clave-de-color -> formula_id seleccionada para ESTE pedido.
+  // Mapa clave-de-color -> formula_id seleccionada para ESTE ítem+columna.
   const [seleccion, setSeleccion] = useState({})
+
+  const puedeSeleccionar = !!(pedidoId && itemTipo && itemId)
 
   async function abrir() {
     const segmentos = segmentosColor(nombreColor)
@@ -32,15 +37,17 @@ export default function FormulaColorBoton({ nombreColor, showToast, pedidoId }) 
 
     const claves = segmentos.map((s) => normalizar(s.texto))
 
-    // Fórmulas guardadas de estos colores + todos los pedidos, para calcular
-    // el pedido más reciente donde se usó cada nombre de color.
-    // Si hay pedidoId, también cargamos qué fórmula está seleccionada para
-    // cada color en ESTE pedido.
+    // Traemos TODAS las fórmulas (para poder agrupar por gama en el cliente),
+    // todos los pedidos (para el "pedido más reciente" de cada palabra), y
+    // si hay pedidoId+itemTipo+itemId, la selección guardada para ESTE ítem
+    // y columna de color exactos (no la de otros ítems que se llamen igual).
     const [{ data: formulas }, { data: pedidos }, seleccionRes] = await Promise.all([
-      supabase.from('formulas_color').select('*').in('color_clave', claves),
+      supabase.from('formulas_color').select('*'),
       supabase.from('pedidos').select('numero, fecha, items_camiseta(colores), items_chaqueta(colores)').order('fecha', { ascending: false }),
-      pedidoId
-        ? supabase.from('pedido_color_formula').select('color_clave, formula_id').eq('pedido_id', pedidoId).in('color_clave', claves)
+      puedeSeleccionar
+        ? supabase.from('pedido_color_formula').select('color_clave, formula_id')
+            .eq('pedido_id', pedidoId).eq('item_tipo', itemTipo).eq('item_id', String(itemId)).eq('color_combo', nombreColor)
+            .in('color_clave', claves)
         : Promise.resolve({ data: [] }),
     ])
 
@@ -68,12 +75,17 @@ export default function FormulaColorBoton({ nombreColor, showToast, pedidoId }) 
 
     const nuevosItems = segmentos.map((s) => {
       const clave = normalizar(s.texto)
+      const gama = gamaDe(s.texto)
+      // Variantes de la MISMA GAMA (no solo del mismo texto exacto), para
+      // poder elegir entre "Azul oscuro", "Azul petroleo", "Azul día"... aunque
+      // el color de este pedido se llame solo "Azul".
       const variantes = (formulas || [])
-        .filter((d) => d.color_clave === clave)
-        .sort((a, b) => (a.id || 0) - (b.id || 0))
+        .filter((d) => gamaDe(d.color_nombre) === gama)
+        .sort((a, b) => (a.color_clave || '').localeCompare(b.color_clave || ''))
       return {
         texto: s.texto,
         clave,
+        gama,
         variantes,
         reciente: recientePorClave.get(clave) || null,
         expandido: null, // id de la variante abierta, o 'nueva'
@@ -106,10 +118,10 @@ export default function FormulaColorBoton({ nombreColor, showToast, pedidoId }) 
     if (!it.formDescripcion.trim()) { showToast?.('⚠️', 'Escribe la fórmula antes de guardar'); return }
     setItems((prev) => prev.map((x, i) => (i === idx ? { ...x, guardando: true } : x)))
 
-    // La etiqueta es automática: el nombre del color.
-    const etiqueta = it.texto
-
     if (it.expandido === 'nueva') {
+      // La etiqueta y el nombre de una fórmula NUEVA son automáticos: el
+      // nombre del color tal como está escrito en ESTE pedido.
+      const etiqueta = it.texto
       const { data, error } = await supabase.from('formulas_color').insert({
         color_clave: it.clave, color_nombre: it.texto, etiqueta, descripcion: it.formDescripcion,
       }).select().single()
@@ -117,8 +129,13 @@ export default function FormulaColorBoton({ nombreColor, showToast, pedidoId }) 
       setItems((prev) => prev.map((x, i) => (i === idx ? { ...x, variantes: [...x.variantes, data], expandido: null, guardando: false } : x)))
       showToast?.('🧪', `Fórmula de "${it.texto}" guardada`)
     } else {
+      // Editar una fórmula EXISTENTE: solo se actualiza su receta. Nunca se
+      // toca su nombre/clave original — puede que la estés viendo desde una
+      // sección de gama distinta (ej. editando "Azul petroleo" mientras
+      // navegas "Azul"), y renombrarla por accidente le haría perder su
+      // identidad y romper otras fórmulas que ya la referencian.
       const { error } = await supabase.from('formulas_color').update({
-        descripcion: it.formDescripcion, color_nombre: it.texto, etiqueta, actualizado_en: new Date().toISOString(),
+        descripcion: it.formDescripcion, actualizado_en: new Date().toISOString(),
       }).eq('id', it.expandido)
       if (error) { showToast?.('⚠️', 'Error al guardar'); setItems((prev) => prev.map((x, i) => (i === idx ? { ...x, guardando: false } : x))); return }
       setItems((prev) => prev.map((x, i) => (i === idx ? {
@@ -126,32 +143,37 @@ export default function FormulaColorBoton({ nombreColor, showToast, pedidoId }) 
         variantes: x.variantes.map((v) => (v.id === it.expandido ? { ...v, descripcion: it.formDescripcion } : v)),
         expandido: null, guardando: false,
       } : x)))
-      showToast?.('🧪', `Fórmula de "${it.texto}" actualizada`)
+      showToast?.('🧪', 'Fórmula actualizada')
     }
   }
 
   async function usarEsta(idx, variante) {
     const it = items[idx]
-    if (!pedidoId) return
+    if (!puedeSeleccionar) return
     const yaEsta = seleccion[it.clave] === variante.id
     if (yaEsta) {
-      // Deseleccionar: quitar la fila.
-      const { error } = await supabase.from('pedido_color_formula').delete().eq('pedido_id', pedidoId).eq('color_clave', it.clave)
+      // Deseleccionar: quitar la fila de ESTE ítem+columna exactos.
+      const { error } = await supabase.from('pedido_color_formula').delete()
+        .eq('pedido_id', pedidoId).eq('item_tipo', itemTipo).eq('item_id', String(itemId)).eq('color_combo', nombreColor).eq('color_clave', it.clave)
       if (error) { showToast?.('⚠️', 'Error al quitar la selección'); return }
       setSeleccion((prev) => { const n = { ...prev }; delete n[it.clave]; return n })
       showToast?.('↩️', `${it.texto}: fórmula quitada de este pedido`)
       return
     }
-    // Upsert: una sola fórmula por color en este pedido.
+    // Upsert: una sola fórmula por color EN ESTE ÍTEM Y COLUMNA exactos —
+    // así dos colores escritos igual en otro ítem del mismo pedido no chocan.
     const { error } = await supabase.from('pedido_color_formula')
-      .upsert({ pedido_id: pedidoId, color_clave: it.clave, formula_id: variante.id }, { onConflict: 'pedido_id,color_clave' })
+      .upsert(
+        { pedido_id: pedidoId, item_tipo: itemTipo, item_id: String(itemId), color_combo: nombreColor, color_clave: it.clave, formula_id: variante.id },
+        { onConflict: 'pedido_id,item_tipo,item_id,color_combo,color_clave' }
+      )
     if (error) { showToast?.('⚠️', 'Error al seleccionar la fórmula'); return }
     setSeleccion((prev) => ({ ...prev, [it.clave]: variante.id }))
     showToast?.('✅', `${it.texto}: fórmula seleccionada para este pedido`)
   }
 
   async function eliminar(idx, variante) {
-    if (!window.confirm(`¿Eliminar esta fórmula de "${items[idx].texto}"? Esto no se puede deshacer.`)) return
+    if (!window.confirm(`¿Eliminar esta fórmula de "${variante.color_nombre}"? Esto no se puede deshacer.`)) return
     const { error } = await supabase.from('formulas_color').delete().eq('id', variante.id)
     if (error) { showToast?.('⚠️', 'Error al eliminar'); return }
     setItems((prev) => prev.map((x, i) => (i === idx ? { ...x, variantes: x.variantes.filter((v) => v.id !== variante.id), expandido: x.expandido === variante.id ? null : x.expandido } : x)))
@@ -174,9 +196,9 @@ export default function FormulaColorBoton({ nombreColor, showToast, pedidoId }) 
           <div className="modal" style={{ maxWidth: 460 }}>
             <div className="mtitle">🧪 Fórmulas de color</div>
             <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16 }}>
-              Cada color de <strong>{nombreColor}</strong> guarda sus fórmulas por separado. Si un
-              mismo color tiene varios tonos, guarda cada uno como una fórmula distinta — se
-              distinguen por su receta y por el pedido más reciente donde se usó.
+              Se muestran todas las variantes de la misma gama (ej. "Azul oscuro", "Azul petroleo",
+              "Azul día" cuentan como variantes de <strong>Azul</strong>), cada una con su nombre
+              original, para que puedas comparar y elegir aunque no se llamen exactamente igual.
             </p>
 
             {cargando ? (
@@ -190,15 +212,15 @@ export default function FormulaColorBoton({ nombreColor, showToast, pedidoId }) 
                   </div>
 
                   {it.variantes.length === 0 && it.expandido !== 'nueva' && (
-                    <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Sin fórmulas guardadas todavía.</p>
+                    <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Sin fórmulas guardadas todavía para esta gama.</p>
                   )}
 
                   {it.variantes.map((v) => (
                     <div key={v.id} style={{ marginBottom: 8 }}>
                       {it.expandido === v.id ? (
-                        <div style={{ background: 'var(--weave)', border: '1px solid var(--border)', borderRadius: 8, padding: 10 }}>
+                        <div style={{ background: 'var(--weave)', border: '1px solid var(--border)', padding: 10, borderRadius: 8 }}>
                           <div className="fld">
-                            <label>Fórmula de "{it.texto}"</label>
+                            <label>Fórmula de "{v.color_nombre}"</label>
                             <textarea
                               value={it.formDescripcion}
                               onChange={(e) => actualizarCampo(idx, 'formDescripcion', e.target.value)}
@@ -222,9 +244,10 @@ export default function FormulaColorBoton({ nombreColor, showToast, pedidoId }) 
                             style={{ flex: 1, textAlign: 'left', background: seleccion[it.clave] === v.id ? '#eaf5ea' : 'var(--weave)', border: seleccion[it.clave] === v.id ? '1.5px solid var(--thread)' : '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', cursor: 'pointer' }}
                           >
                             {seleccion[it.clave] === v.id && <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--thread)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 3 }}>✓ Usada en este pedido</div>}
+                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--thread)', marginBottom: 2 }}>{v.color_nombre}</div>
                             <div style={{ fontSize: 13, color: 'var(--ink)', whiteSpace: 'pre-wrap' }}>{v.descripcion}</div>
                           </button>
-                          {pedidoId && (
+                          {puedeSeleccionar && (
                             <button
                               type="button"
                               onClick={() => usarEsta(idx, v)}
