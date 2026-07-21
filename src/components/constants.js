@@ -21,6 +21,14 @@ export function ordenarTipos(tipos) {
     (a, b) => ORDEN_TIPOS.indexOf(a) - ORDEN_TIPOS.indexOf(b)
   )
 }
+// La GAMA de un color sale de su primera palabra (ej. "Azul oscuro" -> "azul").
+// Se usa para agrupar tonos relacionados: la Carta de colores y las fórmulas
+// de color la usan para que "azul oscuro", "azul petroleo" y "azul" a secas
+// aparezcan juntos como variantes de la misma gama.
+export function gamaDe(nombre) {
+  const prim = String(nombre || '').trim().split(/\s+/)[0] || ''
+  return prim.toLowerCase()
+}
 export const MESES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
