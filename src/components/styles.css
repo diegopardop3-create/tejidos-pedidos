@@ -159,6 +159,20 @@ table.tg tr.tr-tot td.td-l { text-align: left; color: var(--muted); }
 .cell-btn:active { transform: scale(1.05); }
 td.st-ok { background: #d4edda; }
 td.st-falta { background: #fff3cd; }
+td.st-parcial { background: #fff3cd; }
+
+/* Zona clicable por etapa (tejido / empacado): toda el área es el botón,
+   no un ícono diminuto — más fácil de tocar en el celular. Abre el editor
+   de cantidad; el cambio real solo se confirma ahí, nunca con un solo toque. */
+.celda-etapa {
+  display: flex; align-items: center; justify-content: center; gap: 3px;
+  width: 100%; padding: 4px 5px; border-radius: 6px; border: 1px solid transparent;
+  background: none; cursor: pointer; font-size: 10px; font-weight: 700;
+  color: var(--muted); white-space: nowrap; transition: background .15s;
+}
+.celda-etapa:hover { background: rgba(0,0,0,.05); }
+.celda-etapa.st-ok { background: #d4edda; color: #2e7d32; }
+.celda-etapa.st-parcial { background: #ffe8b3; color: #8a5a16; }
 .prod-legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin-bottom: 10px; align-items: center; }
 
 /* IMAGE UPLOAD */
