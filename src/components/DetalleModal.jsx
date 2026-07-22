@@ -16,9 +16,32 @@ function siguienteEtapa(actual) {
 
 export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onCompartir, showToast }) {
   const [lightbox, setLightbox] = useState(null)
+  // Copia local de los estados de cada ítem. Al tocar una celda se actualiza
+  // aquí de una vez (se ve instantáneo) y el guardado en la base va aparte,
+  // en segundo plano. Antes cada toque recargaba TODOS los pedidos con sus
+  // ítems y abonos, y por eso demoraba varios segundos en pintarse.
+  const [estadosLocal, setEstadosLocal] = useState({})
+  const huboCambios = useRef(false)
   if (!pedido) return null
 
-  const pr = calcProgreso(pedido)
+  const estadosDe = (item) => estadosLocal[item.id] ?? item.estados ?? {}
+
+  // Versión del pedido con los estados que se ven en pantalla ahora mismo,
+  // para que la barra de progreso también se mueva al instante.
+  const pedidoVivo = {
+    ...pedido,
+    items_camiseta: (pedido.items_camiseta || []).map((it) => ({ ...it, estados: estadosDe(it) })),
+    items_chaqueta: (pedido.items_chaqueta || []).map((it) => ({ ...it, estados: estadosDe(it) })),
+  }
+
+  // Al cerrar sí refrescamos la lista una sola vez, para que afuera se vea
+  // el progreso actualizado.
+  function cerrar() {
+    if (huboCambios.current) onUpdated()
+    onClose()
+  }
+
+  const pr = calcProgreso(pedidoVivo)
   const esSoloCamiseta = (pedido.items_camiseta || []).length > 0 && (pedido.items_chaqueta || []).length === 0
   const pedidoCompleto = pedido.estado === 'Entregado' ||
     (pr.total > 0 && pr.ok === pr.total) ||
@@ -39,31 +62,41 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
     onUpdated()
   }
 
-  async function persistir(itemId, estados) {
-    const tableName = (pedido.items_camiseta || []).find((it) => it.id === itemId) ? 'items_camiseta' : 'items_chaqueta'
-    const { error } = await supabase.from(tableName).update({ estados }).eq('id', itemId)
-    if (error) { showToast('⚠️', 'Error al guardar'); return }
-    onUpdated()
+  // Pinta el cambio de una vez y guarda en segundo plano. Si el guardado
+  // falla, se devuelve la celda a como estaba y se avisa — así nunca queda
+  // marcada en pantalla algo que no alcanzó a guardarse.
+  async function persistir(item, estados) {
+    const anterior = estadosDe(item)
+    setEstadosLocal((prev) => ({ ...prev, [item.id]: estados }))
+    huboCambios.current = true
+    const esCam = (pedido.items_camiseta || []).some((x) => x.id === item.id)
+    const { error } = await supabase
+      .from(esCam ? 'items_camiseta' : 'items_chaqueta')
+      .update({ estados }).eq('id', item.id)
+    if (error) {
+      setEstadosLocal((prev) => ({ ...prev, [item.id]: anterior }))
+      showToast('⚠️', 'No se pudo guardar, revisa la conexión')
+    }
   }
 
   // Guarda la etapa de una celda. Al borrar (etapa null) también se limpian
   // las claves de los formatos viejos ('|tejido' y '|revisado'); si no, la
   // marca antigua reaparecería y la celda no se vería vacía.
-  async function guardarEtapa(item, itemId, base, etapa) {
-    const estados = { ...(item.estados || {}) }
+  function guardarEtapa(item, base, etapa) {
+    const estados = { ...estadosDe(item) }
     delete estados[`${base}|tejido`]
     delete estados[`${base}|revisado`]
     if (etapa) estados[base] = etapa
     else delete estados[base]
-    await persistir(itemId, estados)
+    persistir(item, estados)
   }
 
   // Guarda cuántas unidades faltan de una celda (0 = no falta nada, se borra).
-  async function guardarFaltan(item, itemId, base, n) {
-    const estados = { ...(item.estados || {}) }
+  function guardarFaltan(item, base, n) {
+    const estados = { ...estadosDe(item) }
     if (n > 0) estados[`${base}|faltan`] = n
     else delete estados[`${base}|faltan`]
-    await persistir(itemId, estados)
+    persistir(item, estados)
   }
 
   async function guardarPesaje(item, kilos) {
@@ -89,7 +122,7 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
   }
 
   return (
-    <div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+    <div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) cerrar() }}>
       <div className="modal">
         <div className="mtitle">Pedido {pedido.numero} — {pedido.cliente}</div>
 
@@ -127,8 +160,8 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
         {(pedido.items_camiseta || []).length > 0 && (
           <div className="msec">
             <h4>👔 Camiseta — {pedido.items_camiseta.length} ítem(s)</h4>
-            {pedido.items_camiseta.map((it) => (
-              <ItemCamView key={it.id} it={it} onEtapa={guardarEtapa} onFaltan={guardarFaltan} onImgClick={setLightbox} showToast={showToast} pedidoId={pedido.id} />
+            {pedido.items_camiseta.map((it, idx) => (
+              <ItemCamView key={it.id} it={it} estados={estadosDe(it)} itemIndice={idx} onEtapa={guardarEtapa} onFaltan={guardarFaltan} onImgClick={setLightbox} showToast={showToast} pedidoId={pedido.id} />
             ))}
           </div>
         )}
@@ -136,14 +169,14 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
         {(pedido.items_chaqueta || []).length > 0 && (
           <div className="msec">
             <h4>🧥 Chaqueta — {pedido.items_chaqueta.length} ítem(s)</h4>
-            {pedido.items_chaqueta.map((it) => (
-              <ItemChaqView key={it.id} it={it} estadoPedido={pedido.estado} onEtapa={guardarEtapa} onFaltan={guardarFaltan} onPesaje={guardarPesaje} onImgClick={setLightbox} showToast={showToast} pedidoId={pedido.id} />
+            {pedido.items_chaqueta.map((it, idx) => (
+              <ItemChaqView key={it.id} it={it} estados={estadosDe(it)} itemIndice={idx} estadoPedido={pedido.estado} onEtapa={guardarEtapa} onFaltan={guardarFaltan} onPesaje={guardarPesaje} onImgClick={setLightbox} showToast={showToast} pedidoId={pedido.id} />
             ))}
           </div>
         )}
 
         <div className="brow right">
-          <button className="btn btn-s" onClick={onClose}>Cerrar</button>
+          <button className="btn btn-s" onClick={cerrar}>Cerrar</button>
           <button className="btn btn-s" onClick={() => imprimirEtiqueta(pedido)}>🏷️ Etiqueta</button>
           <button className="btn btn-s" onClick={() => onCompartir(pedido)}>🔗 Compartir con cliente</button>
           {pedidoCompleto && (
@@ -184,13 +217,15 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
 // Celda tocable: un toque avanza (nada -> 🧵 -> 📦) y mantener presionado
 // borra la marca. El botón ocupa toda la celda para que sea fácil de dar
 // en el celular, sin apuntarle a un ícono diminuto.
-function CeldaEtapa({ etapa, onAvanzar, onLimpiar }) {
+function CeldaEtapa({ etapa, n, onAvanzar, onLimpiar }) {
   const temporizador = useRef(null)
   const fueLargo = useRef(false)
 
   function iniciar() {
     fueLargo.current = false
-    temporizador.current = setTimeout(() => { fueLargo.current = true; onLimpiar() }, 550)
+    // 700 ms: en el celular un toque normal dura más que en el computador,
+    // así que un umbral corto haría que un toque común borre la marca.
+    temporizador.current = setTimeout(() => { fueLargo.current = true; onLimpiar() }, 700)
   }
   function terminar() { clearTimeout(temporizador.current) }
   function manejarClic() {
@@ -212,7 +247,8 @@ function CeldaEtapa({ etapa, onAvanzar, onLimpiar }) {
       onContextMenu={(e) => e.preventDefault()}
       title="Toca: 🧵 tejido → 📦 empacado · Mantén presionado para borrar"
     >
-      {etapa === 'empacado' ? '📦' : etapa === 'tejido' ? '🧵' : '·'}
+      <span className="celda-num">{n}</span>
+      <span className="celda-ico">{etapa === 'empacado' ? '📦' : etapa === 'tejido' ? '🧵' : ''}</span>
     </button>
   )
 }
@@ -244,8 +280,13 @@ function CasillaFaltan({ valor, max, onGuardar }) {
   )
 }
 
-function ItemCamView({ it, onEtapa, onFaltan, onImgClick, showToast, pedidoId }) {
+function ItemCamView({ it, estados, itemIndice, onEtapa, onFaltan, onImgClick, showToast, pedidoId }) {
   const [modoFaltan, setModoFaltan] = useState(false)
+  // La fórmula elegida se ancla a la POSICIÓN del ítem, no a su identificador.
+  // Al guardar un pedido editado los ítems se borran y se vuelven a crear con
+  // identificadores nuevos, así que amarrarla al id hacía que la selección se
+  // perdiera al corregir cantidades. La posición sí sobrevive a esa recreación.
+  const refItem = String(itemIndice)
   const tLabel = it.tipos.map((t) => `${TIPO_ICON[t]} ${TIPO_LABEL[t]}`).join(' + ')
   // Orden explícito guardado; si el ítem es viejo y no lo tiene, lo derivamos
   // como respaldo (Postgres no garantiza el orden de un objeto jsonb).
@@ -290,7 +331,7 @@ function ItemCamView({ it, onEtapa, onFaltan, onImgClick, showToast, pedidoId })
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
                     <ColorSwatch nombre={c} />
                     <span>{c}</span>
-                   <FormulaColorBoton nombreColor={c} showToast={showToast} pedidoId={pedidoId} itemTipo="camiseta" itemId={it.id} />
+                   <FormulaColorBoton nombreColor={c} showToast={showToast} pedidoId={pedidoId} itemTipo="camiseta" itemId={refItem} />
                   </div>
                 </th>
               ))}
@@ -314,23 +355,23 @@ function ItemCamView({ it, onEtapa, onFaltan, onImgClick, showToast, pedidoId })
                     if (!n) return <td key={`${c}_${t}`} style={{ borderLeft: t === it.tipos[0] ? '2px solid #c8e6c9' : '1px solid var(--border)', textAlign: 'center', color: '#ccc' }}>—</td>
                     totFila += n
                     const base = `${talla}|${c}|${t}`
-                    const etapa = etapaCelda(it.estados, base)
-                    const faltan = faltanCelda(it.estados, base)
+                    const etapa = etapaCelda(estados, base)
+                    const faltan = faltanCelda(estados, base)
                     return (
                       <td
                         key={`${c}_${t}`}
-                        className={`${etapa ? 'st-' + etapa : ''} ${faltan > 0 ? 'con-falta' : ''}`}
+                        className={`celda-td ${faltan > 0 ? 'con-falta' : ''}`}
                         style={{ borderLeft: t === it.tipos[0] ? '2px solid #c8e6c9' : '1px solid var(--border)' }}
                       >
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                          <span className="cell-cant">{n}</span>
+                        <div className="celda-wrap">
                           <CeldaEtapa
                             etapa={etapa}
-                            onAvanzar={() => onEtapa(it, it.id, base, siguienteEtapa(etapa))}
-                            onLimpiar={() => onEtapa(it, it.id, base, null)}
+                            n={n}
+                            onAvanzar={() => onEtapa(it, base, siguienteEtapa(etapa))}
+                            onLimpiar={() => onEtapa(it, base, null)}
                           />
                           {modoFaltan && (
-                            <CasillaFaltan valor={faltan} max={n} onGuardar={(v) => onFaltan(it, it.id, base, v)} />
+                            <CasillaFaltan valor={faltan} max={n} onGuardar={(v) => onFaltan(it, base, v)} />
                           )}
                           {!modoFaltan && faltan > 0 && <span className="falta-txt">faltan {faltan}</span>}
                         </div>
@@ -375,9 +416,10 @@ function ItemCamView({ it, onEtapa, onFaltan, onImgClick, showToast, pedidoId })
   )
 }
 
-function ItemChaqView({ it, estadoPedido, onEtapa, onFaltan, onPesaje, onImgClick, showToast, pedidoId }) {
+function ItemChaqView({ it, estados, itemIndice, estadoPedido, onEtapa, onFaltan, onPesaje, onImgClick, showToast, pedidoId }) {
   const [kg, setKg] = useState(it.kilos_reales || '')
   const [modoFaltan, setModoFaltan] = useState(false)
+  const refItem = String(itemIndice)
   const tLabel = it.tipos.map((t) => `${TIPO_ICON[t]} ${TIPO_LABEL[t]}`).join(' + ')
   const p0 = it.precios[it.tipos[0]] || 0
   const coloresPresentes = ((it.colores && it.colores.length) ? it.colores : Object.keys(it.tabla || {})).filter((c) => it.tabla && it.tabla[c])
@@ -411,25 +453,25 @@ function ItemChaqView({ it, estadoPedido, onEtapa, onFaltan, onPesaje, onImgClic
               let totF = 0
               return (
                 <tr key={color}>
-                 <td className="td-key chaq"><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><ColorSwatch nombre={color} /><span>{color}</span><FormulaColorBoton nombreColor={color} showToast={showToast} pedidoId={pedidoId} itemTipo="chaqueta" itemId={it.id} /></div></td>
+                 <td className="td-key chaq"><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><ColorSwatch nombre={color} /><span>{color}</span><FormulaColorBoton nombreColor={color} showToast={showToast} pedidoId={pedidoId} itemTipo="chaqueta" itemId={refItem} /></div></td>
                   {it.tipos.map((t) => {
                     const n = rowObj[t] || 0
                     if (!n) return <td key={t} style={{ textAlign: 'center', color: '#ccc' }}>—</td>
                     totF += n
                     const base = `${color}|${t}`
-                    const etapa = etapaCelda(it.estados, base)
-                    const faltan = faltanCelda(it.estados, base)
+                    const etapa = etapaCelda(estados, base)
+                    const faltan = faltanCelda(estados, base)
                     return (
-                      <td key={t} className={`${etapa ? 'st-' + etapa : ''} ${faltan > 0 ? 'con-falta' : ''}`}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                          <span className="cell-cant">{n}</span>
+                      <td key={t} className={`celda-td ${faltan > 0 ? 'con-falta' : ''}`}>
+                        <div className="celda-wrap">
                           <CeldaEtapa
                             etapa={etapa}
-                            onAvanzar={() => onEtapa(it, it.id, base, siguienteEtapa(etapa))}
-                            onLimpiar={() => onEtapa(it, it.id, base, null)}
+                            n={n}
+                            onAvanzar={() => onEtapa(it, base, siguienteEtapa(etapa))}
+                            onLimpiar={() => onEtapa(it, base, null)}
                           />
                           {modoFaltan && (
-                            <CasillaFaltan valor={faltan} max={n} onGuardar={(v) => onFaltan(it, it.id, base, v)} />
+                            <CasillaFaltan valor={faltan} max={n} onGuardar={(v) => onFaltan(it, base, v)} />
                           )}
                           {!modoFaltan && faltan > 0 && <span className="falta-txt">faltan {faltan}</span>}
                         </div>
