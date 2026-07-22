@@ -159,6 +159,32 @@ export function segmentosColor(nombreCombinado) {
     .filter((s) => s.texto)
 }
 
+// ============================================
+// PROGRESO POR CANTIDADES PARCIALES
+// ============================================
+// Antes cada celda era todo-o-nada ('ok' | 'falta'). Ahora se guarda cuántas
+// unidades de esa celda ya están hechas (un número). Estas dos funciones
+// interpretan ese valor, y también entienden el formato viejo ('ok'/'falta')
+// para que los pedidos ya marcados no pierdan su avance.
+//   - claseCelda: 'ok' (completo), 'parcial' (algunas hechas, faltan otras),
+//     o null (todavía sin tocar).
+//   - cantidadHecha: cuántas unidades de esa celda están confirmadas.
+export function claseCelda(valor, n) {
+  if (valor == null) return null
+  if (valor === 'ok') return 'ok'
+  if (valor === 'falta') return 'parcial' // formato viejo: se trata como incompleto
+  const num = Number(valor) || 0
+  if (num <= 0) return null
+  if (num >= n) return 'ok'
+  return 'parcial'
+}
+
+export function cantidadHecha(valor, n) {
+  if (valor === 'ok') return n
+  if (valor === 'falta' || valor == null) return 0
+  return Math.min(Math.max(Number(valor) || 0, 0), n)
+}
+
 export function calcProgreso(pedido) {
   let total = 0, ok = 0, falta = 0
   const items = [...(pedido.items_camiseta || []), ...(pedido.items_chaqueta || [])]
@@ -178,9 +204,10 @@ export function calcProgreso(pedido) {
               // Si el pedido es de antes de que existieran las dos etapas,
               // usamos la marca vieja como respaldo para no perder el avance ya registrado.
               const claveVieja = `${talla}|${color}|${t}`
-              const est = estados[`${claveVieja}|revisado`] ?? estados[claveVieja]
-              if (est === 'ok') ok++
-              else if (est === 'falta') falta++
+              const valor = estados[`${claveVieja}|revisado`] ?? estados[claveVieja]
+              const clase = claseCelda(valor, colObj[t])
+              if (clase === 'ok') ok++
+              else if (clase === 'parcial') falta++
             }
           })
         })
@@ -190,9 +217,10 @@ export function calcProgreso(pedido) {
         tipos.forEach((t) => {
           if (rowObj[t] > 0) {
             total++
-            const est = estados[`${color}|${t}`]
-            if (est === 'ok') ok++
-            else if (est === 'falta') falta++
+            const valor = estados[`${color}|${t}`]
+            const clase = claseCelda(valor, rowObj[t])
+            if (clase === 'ok') ok++
+            else if (clase === 'parcial') falta++
           }
         })
       })
