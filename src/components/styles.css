@@ -164,15 +164,45 @@ td.st-parcial { background: #fff3cd; }
 /* Zona clicable por etapa (tejido / empacado): toda el área es el botón,
    no un ícono diminuto — más fácil de tocar en el celular. Abre el editor
    de cantidad; el cambio real solo se confirma ahí, nunca con un solo toque. */
+/* Celda tocable de producción: ocupa todo el ancho de la celda para que sea
+   fácil de dar en el celular. Un toque avanza de etapa; mantener presionado
+   borra. El fondo indica en qué va sin necesidad de leer nada. */
 .celda-etapa {
-  display: flex; align-items: center; justify-content: center; gap: 3px;
-  width: 100%; padding: 4px 5px; border-radius: 6px; border: 1px solid transparent;
-  background: none; cursor: pointer; font-size: 10px; font-weight: 700;
-  color: var(--muted); white-space: nowrap; transition: background .15s;
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; padding: 3px 4px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--white);
+  cursor: pointer; font-size: 13px; line-height: 1.1;
+  color: var(--muted); transition: background .15s, transform .1s;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
 }
-.celda-etapa:hover { background: rgba(0,0,0,.05); }
-.celda-etapa.st-ok { background: #d4edda; color: #2e7d32; }
-.celda-etapa.st-parcial { background: #ffe8b3; color: #8a5a16; }
+.celda-etapa:active { transform: scale(.94); }
+.celda-etapa.vacia { color: #c4c4c4; }
+.celda-etapa.tejido { background: #fff3cd; border-color: #e8c96a; }
+.celda-etapa.empacado { background: #4b8523; border-color: #4b8523; }
+
+/* Casilla para anotar cuántas faltan. Roja cuando tiene un número, para que
+   salte a la vista qué quedó incompleto. */
+.casilla-faltan {
+  width: 42px; padding: 2px 3px; margin-top: 1px;
+  border: 1px solid var(--border); border-radius: 5px;
+  font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 700;
+  text-align: center; background: var(--white); color: var(--muted); outline: none;
+}
+.casilla-faltan:focus { border-color: var(--thread); }
+.casilla-faltan.con-falta { border-color: #c0392b; background: #fdecea; color: #c0392b; }
+.falta-txt { font-size: 9px; font-weight: 800; color: #c0392b; font-family: 'DM Mono', monospace; }
+
+/* Botón que activa el modo faltantes (esquina de cada tabla). */
+.btn-faltan {
+  padding: 3px 10px; border-radius: 20px; border: 1px solid var(--border);
+  background: var(--white); color: var(--muted); font-size: 11px;
+  font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.btn-faltan.on { border-color: #c0392b; background: #fdecea; color: #c0392b; }
+
+td.st-tejido { background: #fffbf0; }
+td.st-empacado { background: #d4edda; }
+td.con-falta { box-shadow: inset 0 0 0 1.5px #e8a49c; }
 .prod-legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin-bottom: 10px; align-items: center; }
 
 /* IMAGE UPLOAD */
