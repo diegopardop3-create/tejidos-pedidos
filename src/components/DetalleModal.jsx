@@ -1,10 +1,18 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
-import { TIPO_LABEL, TIPO_ICON, fmtFecha, fmtCOP, calcProgreso, claseCelda, cantidadHecha, ESTADOS, ESTADO_ICON, TALLAS, TALLA_SIN_DIVIDIR, totalesPorTipoCam } from './constants'
+import { TIPO_LABEL, TIPO_ICON, fmtFecha, fmtCOP, calcProgreso, etapaCelda, faltanCelda, ESTADOS, ESTADO_ICON, TALLAS, TALLA_SIN_DIVIDIR, totalesPorTipoCam } from './constants'
 import { generarFacturaPDF, generarFacturaMini, imprimirEtiqueta } from './factura'
 import PanelPagos from './PanelPagos'
 import ColorSwatch from './ColorSwatch'
 import FormulaColorBoton from './FormulaColorBoton'
+
+// Un toque avanza la etapa; nunca la devuelve. Para borrar se mantiene
+// presionada la celda — así un toque de más no desmarca algo ya hecho.
+function siguienteEtapa(actual) {
+  if (actual === 'tejido') return 'empacado'
+  if (actual === 'empacado') return 'empacado' // ya está al final: no cambia
+  return 'tejido'
+}
 
 export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onCompartir, showToast }) {
   const [lightbox, setLightbox] = useState(null)
@@ -31,18 +39,31 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
     onUpdated()
   }
 
-  // Guarda cuántas unidades de una celda están hechas (0..n). Reemplaza al
-  // viejo "todo o nada": ahora se puede marcar un avance parcial, ej. de 19
-  // van 15. Si la cantidad es 0, se borra la marca (celda "sin tocar"),
-  // para no dejar el JSON lleno de ceros.
-  async function guardarCantidad(itemTabla, itemId, ek, cantidad) {
-    const estados = { ...(itemTabla.estados || {}) }
-    if (cantidad > 0) estados[ek] = cantidad
-    else delete estados[ek]
+  async function persistir(itemId, estados) {
     const tableName = (pedido.items_camiseta || []).find((it) => it.id === itemId) ? 'items_camiseta' : 'items_chaqueta'
     const { error } = await supabase.from(tableName).update({ estados }).eq('id', itemId)
     if (error) { showToast('⚠️', 'Error al guardar'); return }
     onUpdated()
+  }
+
+  // Guarda la etapa de una celda. Al borrar (etapa null) también se limpian
+  // las claves de los formatos viejos ('|tejido' y '|revisado'); si no, la
+  // marca antigua reaparecería y la celda no se vería vacía.
+  async function guardarEtapa(item, itemId, base, etapa) {
+    const estados = { ...(item.estados || {}) }
+    delete estados[`${base}|tejido`]
+    delete estados[`${base}|revisado`]
+    if (etapa) estados[base] = etapa
+    else delete estados[base]
+    await persistir(itemId, estados)
+  }
+
+  // Guarda cuántas unidades faltan de una celda (0 = no falta nada, se borra).
+  async function guardarFaltan(item, itemId, base, n) {
+    const estados = { ...(item.estados || {}) }
+    if (n > 0) estados[`${base}|faltan`] = n
+    else delete estados[`${base}|faltan`]
+    await persistir(itemId, estados)
   }
 
   async function guardarPesaje(item, kilos) {
@@ -94,11 +115,11 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
                 <div style={{ fontSize: 10, fontFamily: "'DM Mono', monospace", color: 'var(--yarn)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 5 }}>Progreso de producción</div>
                 <div className="prog-wrap" style={{ height: 8 }}><div className="prog-bar" style={{ width: `${pr.pct}%` }} /></div>
               </div>
-              <div style={{ fontFamily: "'DM Mono', monospace", color: '#fff', fontSize: 13, whiteSpace: 'nowrap' }}>✅ {pr.ok}/{pr.total} {pr.falta > 0 && `· 🟡 ${pr.falta}`}</div>
+              <div style={{ fontFamily: "'DM Mono', monospace", color: '#fff', fontSize: 13, whiteSpace: 'nowrap' }}>📦 {pr.ok}/{pr.total} {pr.falta > 0 && `· 🔴 ${pr.falta}`}</div>
             </div>
             <div className="prod-legend">
-              <span>Toca una etapa para marcar cuánto va:</span>
-              <span style={{ color: 'var(--muted)', fontSize: 10 }}>· En camiseta: 🧵 tejido y 📦 empacado son etapas independientes</span>
+              <span>Toca una celda: 1ª vez 🧵 tejido · 2ª vez 📦 empacado</span>
+              <span style={{ color: 'var(--muted)', fontSize: 10 }}>· Mantén presionado para borrar la marca</span>
             </div>
           </>
         )}
@@ -107,7 +128,7 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
           <div className="msec">
             <h4>👔 Camiseta — {pedido.items_camiseta.length} ítem(s)</h4>
             {pedido.items_camiseta.map((it) => (
-              <ItemCamView key={it.id} it={it} onToggle={guardarCantidad} onImgClick={setLightbox} showToast={showToast} pedidoId={pedido.id} />
+              <ItemCamView key={it.id} it={it} onEtapa={guardarEtapa} onFaltan={guardarFaltan} onImgClick={setLightbox} showToast={showToast} pedidoId={pedido.id} />
             ))}
           </div>
         )}
@@ -116,7 +137,7 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
           <div className="msec">
             <h4>🧥 Chaqueta — {pedido.items_chaqueta.length} ítem(s)</h4>
             {pedido.items_chaqueta.map((it) => (
-              <ItemChaqView key={it.id} it={it} estadoPedido={pedido.estado} onToggle={guardarCantidad} onPesaje={guardarPesaje} onImgClick={setLightbox} showToast={showToast} pedidoId={pedido.id} />
+              <ItemChaqView key={it.id} it={it} estadoPedido={pedido.estado} onEtapa={guardarEtapa} onFaltan={guardarFaltan} onPesaje={guardarPesaje} onImgClick={setLightbox} showToast={showToast} pedidoId={pedido.id} />
             ))}
           </div>
         )}
@@ -160,8 +181,71 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
   )
 }
 
-function ItemCamView({ it, onToggle, onImgClick, showToast, pedidoId }) {
-  const [editando, setEditando] = useState(null) // { ek, n, etiqueta, valorActual }
+// Celda tocable: un toque avanza (nada -> 🧵 -> 📦) y mantener presionado
+// borra la marca. El botón ocupa toda la celda para que sea fácil de dar
+// en el celular, sin apuntarle a un ícono diminuto.
+function CeldaEtapa({ etapa, onAvanzar, onLimpiar }) {
+  const temporizador = useRef(null)
+  const fueLargo = useRef(false)
+
+  function iniciar() {
+    fueLargo.current = false
+    temporizador.current = setTimeout(() => { fueLargo.current = true; onLimpiar() }, 550)
+  }
+  function terminar() { clearTimeout(temporizador.current) }
+  function manejarClic() {
+    // Si acabó de dispararse el "mantener presionado", ese toque ya cumplió
+    // su función (borrar) y no debe además avanzar la etapa.
+    if (fueLargo.current) { fueLargo.current = false; return }
+    onAvanzar()
+  }
+
+  return (
+    <button
+      type="button"
+      className={`celda-etapa ${etapa || 'vacia'}`}
+      onPointerDown={iniciar}
+      onPointerUp={terminar}
+      onPointerLeave={terminar}
+      onPointerCancel={terminar}
+      onClick={manejarClic}
+      onContextMenu={(e) => e.preventDefault()}
+      title="Toca: 🧵 tejido → 📦 empacado · Mantén presionado para borrar"
+    >
+      {etapa === 'empacado' ? '📦' : etapa === 'tejido' ? '🧵' : '·'}
+    </button>
+  )
+}
+
+// Casilla roja para escribir cuántas unidades faltan de esa celda. Solo se
+// ve cuando está activado el modo faltantes. Guarda al salir del campo
+// (no en cada tecla) para no golpear la base de datos en cada número.
+function CasillaFaltan({ valor, max, onGuardar }) {
+  const [txt, setTxt] = useState(valor ? String(valor) : '')
+  useEffect(() => { setTxt(valor ? String(valor) : '') }, [valor])
+
+  function guardar() {
+    const n = Math.max(0, Math.min(max, parseInt(txt) || 0))
+    setTxt(n ? String(n) : '')
+    if (n !== valor) onGuardar(n)
+  }
+
+  return (
+    <input
+      type="number" min="0" max={max}
+      value={txt}
+      onChange={(e) => setTxt(e.target.value)}
+      onBlur={guardar}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+      className={`casilla-faltan ${valor > 0 ? 'con-falta' : ''}`}
+      placeholder="—"
+      title="Cuántas unidades faltan de esta celda"
+    />
+  )
+}
+
+function ItemCamView({ it, onEtapa, onFaltan, onImgClick, showToast, pedidoId }) {
+  const [modoFaltan, setModoFaltan] = useState(false)
   const tLabel = it.tipos.map((t) => `${TIPO_ICON[t]} ${TIPO_LABEL[t]}`).join(' + ')
   // Orden explícito guardado; si el ítem es viejo y no lo tiene, lo derivamos
   // como respaldo (Postgres no garantiza el orden de un objeto jsonb).
@@ -175,11 +259,6 @@ function ItemCamView({ it, onToggle, onImgClick, showToast, pedidoId }) {
   const tallasPresentes = TALLAS.filter((t) => it.tabla && it.tabla[t])
   if (it.tabla && it.tabla[TALLA_SIN_DIVIDIR]) tallasPresentes.push(TALLA_SIN_DIVIDIR)
 
-  function confirmarEditor(cantidad) {
-    onToggle(it, it.id, editando.ek, cantidad)
-    setEditando(null)
-  }
-
   return (
     <div style={{ background: 'var(--loom)', border: '1px solid var(--cbd)', borderRadius: 9, padding: 12, marginBottom: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
@@ -188,7 +267,17 @@ function ItemCamView({ it, onToggle, onImgClick, showToast, pedidoId }) {
           {it.precios?.juego && <span className="badge cam" style={{ background: '#4b8523', color: '#fff' }}>🎽 Juego {fmtCOP(it.precios.juego)} c/u</span>}
           {it.diseno && <span style={{ fontSize: 12, color: 'var(--muted)' }}>{it.diseno}</span>}
         </div>
-        <span className="itot">{fmtCOP(it.total_precio)}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            type="button"
+            className={`btn-faltan ${modoFaltan ? 'on' : ''}`}
+            onClick={() => setModoFaltan((v) => !v)}
+            title="Muestra una casilla en cada celda para anotar cuántas faltan"
+          >
+            🔴 Faltantes
+          </button>
+          <span className="itot">{fmtCOP(it.total_precio)}</span>
+        </div>
       </div>
 
       <div className="tscroll cam-scroll">
@@ -225,34 +314,25 @@ function ItemCamView({ it, onToggle, onImgClick, showToast, pedidoId }) {
                     if (!n) return <td key={`${c}_${t}`} style={{ borderLeft: t === it.tipos[0] ? '2px solid #c8e6c9' : '1px solid var(--border)', textAlign: 'center', color: '#ccc' }}>—</td>
                     totFila += n
                     const base = `${talla}|${c}|${t}`
-                    const ekTejido = `${base}|tejido`
-                    const ekEmpacado = `${base}|revisado`
-                    const valTejido = (it.estados || {})[ekTejido]
-                    const valEmpacado = (it.estados || {})[ekEmpacado]
-                    const claseTejido = claseCelda(valTejido, n)
-                    const claseEmpacado = claseCelda(valEmpacado, n)
-                    const hechoTejido = cantidadHecha(valTejido, n)
-                    const hechoEmpacado = cantidadHecha(valEmpacado, n)
+                    const etapa = etapaCelda(it.estados, base)
+                    const faltan = faltanCelda(it.estados, base)
                     return (
-                      <td key={`${c}_${t}`} className={claseEmpacado === 'ok' ? 'st-ok' : claseEmpacado === 'parcial' ? 'st-parcial' : ''} style={{ borderLeft: t === it.tipos[0] ? '2px solid #c8e6c9' : '1px solid var(--border)' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                      <td
+                        key={`${c}_${t}`}
+                        className={`${etapa ? 'st-' + etapa : ''} ${faltan > 0 ? 'con-falta' : ''}`}
+                        style={{ borderLeft: t === it.tipos[0] ? '2px solid #c8e6c9' : '1px solid var(--border)' }}
+                      >
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                           <span className="cell-cant">{n}</span>
-                          <button
-                            type="button"
-                            className={`celda-etapa ${claseTejido === 'ok' ? 'st-ok' : claseTejido === 'parcial' ? 'st-parcial' : ''}`}
-                            title="Tejido — toca para marcar cuánto va"
-                            onClick={() => setEditando({ ek: ekTejido, n, etiqueta: `🧵 Tejido — ${talla} · ${c} · ${TIPO_LABEL[t]}`, valorActual: hechoTejido })}
-                          >
-                            🧵{claseTejido === 'parcial' ? ` faltan ${n - hechoTejido}` : ''}
-                          </button>
-                          <button
-                            type="button"
-                            className={`celda-etapa ${claseEmpacado === 'ok' ? 'st-ok' : claseEmpacado === 'parcial' ? 'st-parcial' : ''}`}
-                            title="Revisado y empacado — toca para marcar cuánto va"
-                            onClick={() => setEditando({ ek: ekEmpacado, n, etiqueta: `📦 Empacado — ${talla} · ${c} · ${TIPO_LABEL[t]}`, valorActual: hechoEmpacado })}
-                          >
-                            {claseEmpacado === 'ok' ? '✅' : '📦'}{claseEmpacado === 'parcial' ? ` faltan ${n - hechoEmpacado}` : ''}
-                          </button>
+                          <CeldaEtapa
+                            etapa={etapa}
+                            onAvanzar={() => onEtapa(it, it.id, base, siguienteEtapa(etapa))}
+                            onLimpiar={() => onEtapa(it, it.id, base, null)}
+                          />
+                          {modoFaltan && (
+                            <CasillaFaltan valor={faltan} max={n} onGuardar={(v) => onFaltan(it, it.id, base, v)} />
+                          )}
+                          {!modoFaltan && faltan > 0 && <span className="falta-txt">faltan {faltan}</span>}
                         </div>
                       </td>
                     )
@@ -291,23 +371,16 @@ function ItemCamView({ it, onToggle, onImgClick, showToast, pedidoId }) {
           </div>
         )
       })()}
-
-      <EditorCantidad info={editando} onCerrar={() => setEditando(null)} onConfirmar={confirmarEditor} />
     </div>
   )
 }
 
-function ItemChaqView({ it, estadoPedido, onToggle, onPesaje, onImgClick, showToast, pedidoId }) {
+function ItemChaqView({ it, estadoPedido, onEtapa, onFaltan, onPesaje, onImgClick, showToast, pedidoId }) {
   const [kg, setKg] = useState(it.kilos_reales || '')
-  const [editando, setEditando] = useState(null)
+  const [modoFaltan, setModoFaltan] = useState(false)
   const tLabel = it.tipos.map((t) => `${TIPO_ICON[t]} ${TIPO_LABEL[t]}`).join(' + ')
   const p0 = it.precios[it.tipos[0]] || 0
   const coloresPresentes = ((it.colores && it.colores.length) ? it.colores : Object.keys(it.tabla || {})).filter((c) => it.tabla && it.tabla[c])
-
-  function confirmarEditor(cantidad) {
-    onToggle(it, it.id, editando.ek, cantidad)
-    setEditando(null)
-  }
 
   return (
     <div style={{ background: 'var(--loom)', border: '1px solid var(--jbd)', borderRadius: 9, padding: 12, marginBottom: 8 }}>
@@ -316,7 +389,17 @@ function ItemChaqView({ it, estadoPedido, onToggle, onPesaje, onImgClick, showTo
           <span className="badge chaq">{tLabel}</span>
           {it.diseno && <span style={{ fontSize: 12, color: 'var(--muted)' }}>{it.diseno}</span>}
         </div>
-        <span className={`itot ${it.kilos_reales ? '' : 'pend'}`}>{it.kilos_reales ? `✅ ${fmtCOP(it.total_final)}` : '⚖️ Pendiente de pesaje'}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            type="button"
+            className={`btn-faltan ${modoFaltan ? 'on' : ''}`}
+            onClick={() => setModoFaltan((v) => !v)}
+            title="Muestra una casilla en cada celda para anotar cuántas faltan"
+          >
+            🔴 Faltantes
+          </button>
+          <span className={`itot ${it.kilos_reales ? '' : 'pend'}`}>{it.kilos_reales ? `✅ ${fmtCOP(it.total_final)}` : '⚖️ Pendiente de pesaje'}</span>
+        </div>
       </div>
 
       <div className="tscroll chaq-scroll">
@@ -333,22 +416,22 @@ function ItemChaqView({ it, estadoPedido, onToggle, onPesaje, onImgClick, showTo
                     const n = rowObj[t] || 0
                     if (!n) return <td key={t} style={{ textAlign: 'center', color: '#ccc' }}>—</td>
                     totF += n
-                    const ek = `${color}|${t}`
-                    const valor = (it.estados || {})[ek]
-                    const clase = claseCelda(valor, n)
-                    const hecho = cantidadHecha(valor, n)
+                    const base = `${color}|${t}`
+                    const etapa = etapaCelda(it.estados, base)
+                    const faltan = faltanCelda(it.estados, base)
                     return (
-                      <td key={t} className={clase === 'ok' ? 'st-ok' : clase === 'parcial' ? 'st-parcial' : ''}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                      <td key={t} className={`${etapa ? 'st-' + etapa : ''} ${faltan > 0 ? 'con-falta' : ''}`}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                           <span className="cell-cant">{n}</span>
-                          <button
-                            type="button"
-                            className={`celda-etapa ${clase === 'ok' ? 'st-ok' : clase === 'parcial' ? 'st-parcial' : ''}`}
-                            title="Toca para marcar cuánto va"
-                            onClick={() => setEditando({ ek, n, etiqueta: `${TIPO_LABEL[t]} — ${color}`, valorActual: hecho })}
-                          >
-                            {clase === 'ok' ? '✅' : '📦'}{clase === 'parcial' ? ` faltan ${n - hecho}` : ''}
-                          </button>
+                          <CeldaEtapa
+                            etapa={etapa}
+                            onAvanzar={() => onEtapa(it, it.id, base, siguienteEtapa(etapa))}
+                            onLimpiar={() => onEtapa(it, it.id, base, null)}
+                          />
+                          {modoFaltan && (
+                            <CasillaFaltan valor={faltan} max={n} onGuardar={(v) => onFaltan(it, it.id, base, v)} />
+                          )}
+                          {!modoFaltan && faltan > 0 && <span className="falta-txt">faltan {faltan}</span>}
                         </div>
                       </td>
                     )
@@ -382,54 +465,6 @@ function ItemChaqView({ it, estadoPedido, onToggle, onPesaje, onImgClick, showTo
       ) : it.kilos_reales ? (
         <div style={{ fontSize: 12, color: 'var(--thread)', marginTop: 6, fontWeight: 600 }}>✅ {it.kilos_reales} kg · {fmtCOP(it.total_final)}</div>
       ) : null}
-
-      <EditorCantidad info={editando} onCerrar={() => setEditando(null)} onConfirmar={confirmarEditor} />
-    </div>
-  )
-}
-
-// Modal compartido: edita cuántas unidades de UNA celda (una etapa de un
-// color/talla/tipo) están hechas. Abrir el modal es el "primer paso"
-// (tentativo, nada se guarda todavía); tocar "Guardar" es la confirmación
-// final que sí escribe el cambio — así un toque accidental en la tabla
-// nunca marca ni desmarca nada por sí solo.
-function EditorCantidad({ info, onCerrar, onConfirmar }) {
-  const [valor, setValor] = useState(0)
-  useEffect(() => { if (info) setValor(info.valorActual || 0) }, [info])
-  if (!info) return null
-  const { etiqueta, n } = info
-  const faltan = Math.max(0, n - valor)
-
-  return (
-    <div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) onCerrar() }}>
-      <div className="modal" style={{ maxWidth: 340 }}>
-        <div className="mtitle">{etiqueta}</div>
-        <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16 }}>Cantidad total de esta celda: <strong>{n}</strong></p>
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginBottom: 12 }}>
-          <button type="button" className="btn btn-s" onClick={() => setValor((v) => Math.max(0, v - 1))}>−</button>
-          <input
-            type="number" min="0" max={n} value={valor}
-            onChange={(e) => setValor(Math.max(0, Math.min(n, parseInt(e.target.value) || 0)))}
-            style={{ width: 74, textAlign: 'center', fontSize: 22, fontWeight: 800, fontFamily: "'DM Mono', monospace", border: '1px solid var(--border)', borderRadius: 8, padding: '6px 4px' }}
-          />
-          <button type="button" className="btn btn-s" onClick={() => setValor((v) => Math.min(n, v + 1))}>＋</button>
-        </div>
-
-        <div style={{ textAlign: 'center', fontSize: 12, fontWeight: 700, marginBottom: 14, color: valor === 0 ? 'var(--muted)' : faltan === 0 ? 'var(--thread)' : 'var(--warn)' }}>
-          {valor === 0 ? 'Nada hecho todavía' : faltan === 0 ? '✅ Completo' : `Van ${valor} de ${n} — faltan ${faltan}`}
-        </div>
-
-        <div className="brow" style={{ justifyContent: 'center', gap: 8, marginBottom: 14 }}>
-          <button type="button" className="btn btn-s btn-sm" onClick={() => setValor(0)}>Nada</button>
-          <button type="button" className="btn btn-s btn-sm" onClick={() => setValor(n)}>✅ Completo</button>
-        </div>
-
-        <div className="brow right">
-          <button className="btn btn-s" onClick={onCerrar}>Cancelar</button>
-          <button className="btn btn-p" onClick={() => onConfirmar(valor)}>💾 Guardar</button>
-        </div>
-      </div>
     </div>
   )
 }
