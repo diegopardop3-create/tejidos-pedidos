@@ -160,29 +160,40 @@ export function segmentosColor(nombreCombinado) {
 }
 
 // ============================================
-// PROGRESO POR CANTIDADES PARCIALES
+// ETAPA Y FALTANTES DE CADA CELDA
 // ============================================
-// Antes cada celda era todo-o-nada ('ok' | 'falta'). Ahora se guarda cuántas
-// unidades de esa celda ya están hechas (un número). Estas dos funciones
-// interpretan ese valor, y también entienden el formato viejo ('ok'/'falta')
-// para que los pedidos ya marcados no pierdan su avance.
-//   - claseCelda: 'ok' (completo), 'parcial' (algunas hechas, faltan otras),
-//     o null (todavía sin tocar).
-//   - cantidadHecha: cuántas unidades de esa celda están confirmadas.
-export function claseCelda(valor, n) {
-  if (valor == null) return null
-  if (valor === 'ok') return 'ok'
-  if (valor === 'falta') return 'parcial' // formato viejo: se trata como incompleto
-  const num = Number(valor) || 0
-  if (num <= 0) return null
-  if (num >= n) return 'ok'
-  return 'parcial'
+// Cada celda de la tabla de producción guarda dos cosas independientes:
+//   1. La ETAPA en la que va: null (sin empezar) -> 'tejido' -> 'empacado'.
+//      Avanza con un toque; se borra manteniendo presionado.
+//   2. Cuántas unidades FALTAN de esa celda (un número que se escribe a mano).
+//      Es una sola cifra por celda, sin importar la etapa.
+//
+// Estas funciones también entienden los formatos viejos para que ningún
+// pedido ya marcado pierda su avance:
+//   - 'ok'/'falta' sueltos (formato original de todo-o-nada)
+//   - claves separadas '|tejido' y '|revisado' (formato de dos etapas)
+//   - números sueltos (formato de cantidades parciales)
+export function etapaCelda(estados, base) {
+  const e = estados || {}
+  const directo = e[base]
+  if (directo === 'tejido' || directo === 'empacado') return directo
+
+  // Formato viejo de dos etapas: si la etapa final estaba marcada, es
+  // 'empacado'; si solo estaba la de tejido, es 'tejido'.
+  const viejoEmpacado = e[`${base}|revisado`]
+  const viejoTejido = e[`${base}|tejido`]
+  const marcado = (v) => v === 'ok' || (Number(v) > 0)
+  if (marcado(viejoEmpacado)) return 'empacado'
+  if (marcado(viejoTejido)) return 'tejido'
+
+  // Formato original de una sola marca (chaqueta y pedidos muy viejos).
+  if (marcado(directo)) return 'empacado'
+  return null
 }
 
-export function cantidadHecha(valor, n) {
-  if (valor === 'ok') return n
-  if (valor === 'falta' || valor == null) return 0
-  return Math.min(Math.max(Number(valor) || 0, 0), n)
+export function faltanCelda(estados, base) {
+  const n = Number((estados || {})[`${base}|faltan`]) || 0
+  return n > 0 ? n : 0
 }
 
 export function calcProgreso(pedido) {
@@ -200,14 +211,10 @@ export function calcProgreso(pedido) {
           tipos.forEach((t) => {
             if (colObj[t] > 0) {
               total++
-              // El progreso cuenta la etapa final (revisado y empacado).
-              // Si el pedido es de antes de que existieran las dos etapas,
-              // usamos la marca vieja como respaldo para no perder el avance ya registrado.
-              const claveVieja = `${talla}|${color}|${t}`
-              const valor = estados[`${claveVieja}|revisado`] ?? estados[claveVieja]
-              const clase = claseCelda(valor, colObj[t])
-              if (clase === 'ok') ok++
-              else if (clase === 'parcial') falta++
+              const base = `${talla}|${color}|${t}`
+              // El progreso cuenta la etapa final: solo suma cuando ya está empacado.
+              if (etapaCelda(estados, base) === 'empacado') ok++
+              if (faltanCelda(estados, base) > 0) falta++
             }
           })
         })
@@ -217,10 +224,9 @@ export function calcProgreso(pedido) {
         tipos.forEach((t) => {
           if (rowObj[t] > 0) {
             total++
-            const valor = estados[`${color}|${t}`]
-            const clase = claseCelda(valor, rowObj[t])
-            if (clase === 'ok') ok++
-            else if (clase === 'parcial') falta++
+            const base = `${color}|${t}`
+            if (etapaCelda(estados, base) === 'empacado') ok++
+            if (faltanCelda(estados, base) > 0) falta++
           }
         })
       })
