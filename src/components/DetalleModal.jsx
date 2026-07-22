@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
-import { TIPO_LABEL, TIPO_ICON, fmtFecha, fmtCOP, calcProgreso, ESTADOS, ESTADO_ICON, TALLAS, TALLA_SIN_DIVIDIR, totalesPorTipoCam } from './constants'
+import { TIPO_LABEL, TIPO_ICON, fmtFecha, fmtCOP, calcProgreso, claseCelda, cantidadHecha, ESTADOS, ESTADO_ICON, TALLAS, TALLA_SIN_DIVIDIR, totalesPorTipoCam } from './constants'
 import { generarFacturaPDF, generarFacturaMini, imprimirEtiqueta } from './factura'
 import PanelPagos from './PanelPagos'
 import ColorSwatch from './ColorSwatch'
@@ -31,10 +31,14 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
     onUpdated()
   }
 
-  async function toggleCelda(itemTabla, itemId, ek, nuevoEstado) {
+  // Guarda cuántas unidades de una celda están hechas (0..n). Reemplaza al
+  // viejo "todo o nada": ahora se puede marcar un avance parcial, ej. de 19
+  // van 15. Si la cantidad es 0, se borra la marca (celda "sin tocar"),
+  // para no dejar el JSON lleno de ceros.
+  async function guardarCantidad(itemTabla, itemId, ek, cantidad) {
     const estados = { ...(itemTabla.estados || {}) }
-    estados[ek] = estados[ek] === nuevoEstado ? null : nuevoEstado
-    const tabla = itemTabla === itemTabla // referencia
+    if (cantidad > 0) estados[ek] = cantidad
+    else delete estados[ek]
     const tableName = (pedido.items_camiseta || []).find((it) => it.id === itemId) ? 'items_camiseta' : 'items_chaqueta'
     const { error } = await supabase.from(tableName).update({ estados }).eq('id', itemId)
     if (error) { showToast('⚠️', 'Error al guardar'); return }
@@ -90,12 +94,11 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
                 <div style={{ fontSize: 10, fontFamily: "'DM Mono', monospace", color: 'var(--yarn)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 5 }}>Progreso de producción</div>
                 <div className="prog-wrap" style={{ height: 8 }}><div className="prog-bar" style={{ width: `${pr.pct}%` }} /></div>
               </div>
-              <div style={{ fontFamily: "'DM Mono', monospace", color: '#fff', fontSize: 13, whiteSpace: 'nowrap' }}>✅ {pr.ok}/{pr.total} {pr.falta > 0 && `· ❓ ${pr.falta}`}</div>
+              <div style={{ fontFamily: "'DM Mono', monospace", color: '#fff', fontSize: 13, whiteSpace: 'nowrap' }}>✅ {pr.ok}/{pr.total} {pr.falta > 0 && `· 🟡 ${pr.falta}`}</div>
             </div>
             <div className="prod-legend">
-              <span>Toca para marcar cada cantidad:</span><span>✅ Completa</span><span>❓ Falta</span>
-              <span style={{ color: 'var(--muted)', fontSize: 10 }}>(toca de nuevo para quitar)</span>
-              <span style={{ color: 'var(--muted)', fontSize: 10 }}>· En camiseta: 🧵 tejido y 📦 revisado/empacado son etapas independientes</span>
+              <span>Toca una etapa para marcar cuánto va:</span>
+              <span style={{ color: 'var(--muted)', fontSize: 10 }}>· En camiseta: 🧵 tejido y 📦 empacado son etapas independientes</span>
             </div>
           </>
         )}
@@ -104,7 +107,7 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
           <div className="msec">
             <h4>👔 Camiseta — {pedido.items_camiseta.length} ítem(s)</h4>
             {pedido.items_camiseta.map((it) => (
-              <ItemCamView key={it.id} it={it} onToggle={toggleCelda} onImgClick={setLightbox} showToast={showToast} pedidoId={pedido.id} />
+              <ItemCamView key={it.id} it={it} onToggle={guardarCantidad} onImgClick={setLightbox} showToast={showToast} pedidoId={pedido.id} />
             ))}
           </div>
         )}
@@ -113,7 +116,7 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
           <div className="msec">
             <h4>🧥 Chaqueta — {pedido.items_chaqueta.length} ítem(s)</h4>
             {pedido.items_chaqueta.map((it) => (
-              <ItemChaqView key={it.id} it={it} estadoPedido={pedido.estado} onToggle={toggleCelda} onPesaje={guardarPesaje} onImgClick={setLightbox} showToast={showToast} pedidoId={pedido.id} />
+              <ItemChaqView key={it.id} it={it} estadoPedido={pedido.estado} onToggle={guardarCantidad} onPesaje={guardarPesaje} onImgClick={setLightbox} showToast={showToast} pedidoId={pedido.id} />
             ))}
           </div>
         )}
@@ -158,6 +161,7 @@ export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onC
 }
 
 function ItemCamView({ it, onToggle, onImgClick, showToast, pedidoId }) {
+  const [editando, setEditando] = useState(null) // { ek, n, etiqueta, valorActual }
   const tLabel = it.tipos.map((t) => `${TIPO_ICON[t]} ${TIPO_LABEL[t]}`).join(' + ')
   // Orden explícito guardado; si el ítem es viejo y no lo tiene, lo derivamos
   // como respaldo (Postgres no garantiza el orden de un objeto jsonb).
@@ -170,6 +174,11 @@ function ItemCamView({ it, onToggle, onImgClick, showToast, pedidoId }) {
   })()
   const tallasPresentes = TALLAS.filter((t) => it.tabla && it.tabla[t])
   if (it.tabla && it.tabla[TALLA_SIN_DIVIDIR]) tallasPresentes.push(TALLA_SIN_DIVIDIR)
+
+  function confirmarEditor(cantidad) {
+    onToggle(it, it.id, editando.ek, cantidad)
+    setEditando(null)
+  }
 
   return (
     <div style={{ background: 'var(--loom)', border: '1px solid var(--cbd)', borderRadius: 9, padding: 12, marginBottom: 8 }}>
@@ -218,22 +227,32 @@ function ItemCamView({ it, onToggle, onImgClick, showToast, pedidoId }) {
                     const base = `${talla}|${c}|${t}`
                     const ekTejido = `${base}|tejido`
                     const ekEmpacado = `${base}|revisado`
-                    const estTejido = (it.estados || {})[ekTejido]
-                    const estEmpacado = (it.estados || {})[ekEmpacado]
+                    const valTejido = (it.estados || {})[ekTejido]
+                    const valEmpacado = (it.estados || {})[ekEmpacado]
+                    const claseTejido = claseCelda(valTejido, n)
+                    const claseEmpacado = claseCelda(valEmpacado, n)
+                    const hechoTejido = cantidadHecha(valTejido, n)
+                    const hechoEmpacado = cantidadHecha(valEmpacado, n)
                     return (
-                      <td key={`${c}_${t}`} className={estEmpacado === 'ok' ? 'st-ok' : estEmpacado === 'falta' ? 'st-falta' : ''} style={{ borderLeft: t === it.tipos[0] ? '2px solid #c8e6c9' : '1px solid var(--border)' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                      <td key={`${c}_${t}`} className={claseEmpacado === 'ok' ? 'st-ok' : claseEmpacado === 'parcial' ? 'st-parcial' : ''} style={{ borderLeft: t === it.tipos[0] ? '2px solid #c8e6c9' : '1px solid var(--border)' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
                           <span className="cell-cant">{n}</span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <span style={{ fontSize: 8, color: 'var(--muted)' }} title="Tejido">🧵</span>
-                            <button className="cell-btn" title="Tejido: completo" style={{ opacity: estTejido === 'ok' ? 1 : .35 }} onClick={() => onToggle(it, it.id, ekTejido, 'ok')}>✅</button>
-                            <button className="cell-btn" title="Tejido: falta" style={{ opacity: estTejido === 'falta' ? 1 : .35 }} onClick={() => onToggle(it, it.id, ekTejido, 'falta')}>❓</button>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <span style={{ fontSize: 8, color: 'var(--muted)' }} title="Revisado y empacado">📦</span>
-                            <button className="cell-btn" title="Revisado y empacado: completo" style={{ opacity: estEmpacado === 'ok' ? 1 : .35 }} onClick={() => onToggle(it, it.id, ekEmpacado, 'ok')}>✅</button>
-                            <button className="cell-btn" title="Revisado y empacado: falta" style={{ opacity: estEmpacado === 'falta' ? 1 : .35 }} onClick={() => onToggle(it, it.id, ekEmpacado, 'falta')}>❓</button>
-                          </div>
+                          <button
+                            type="button"
+                            className={`celda-etapa ${claseTejido === 'ok' ? 'st-ok' : claseTejido === 'parcial' ? 'st-parcial' : ''}`}
+                            title="Tejido — toca para marcar cuánto va"
+                            onClick={() => setEditando({ ek: ekTejido, n, etiqueta: `🧵 Tejido — ${talla} · ${c} · ${TIPO_LABEL[t]}`, valorActual: hechoTejido })}
+                          >
+                            🧵{claseTejido === 'parcial' ? ` faltan ${n - hechoTejido}` : ''}
+                          </button>
+                          <button
+                            type="button"
+                            className={`celda-etapa ${claseEmpacado === 'ok' ? 'st-ok' : claseEmpacado === 'parcial' ? 'st-parcial' : ''}`}
+                            title="Revisado y empacado — toca para marcar cuánto va"
+                            onClick={() => setEditando({ ek: ekEmpacado, n, etiqueta: `📦 Empacado — ${talla} · ${c} · ${TIPO_LABEL[t]}`, valorActual: hechoEmpacado })}
+                          >
+                            {claseEmpacado === 'ok' ? '✅' : '📦'}{claseEmpacado === 'parcial' ? ` faltan ${n - hechoEmpacado}` : ''}
+                          </button>
                         </div>
                       </td>
                     )
@@ -272,15 +291,23 @@ function ItemCamView({ it, onToggle, onImgClick, showToast, pedidoId }) {
           </div>
         )
       })()}
+
+      <EditorCantidad info={editando} onCerrar={() => setEditando(null)} onConfirmar={confirmarEditor} />
     </div>
   )
 }
 
 function ItemChaqView({ it, estadoPedido, onToggle, onPesaje, onImgClick, showToast, pedidoId }) {
   const [kg, setKg] = useState(it.kilos_reales || '')
+  const [editando, setEditando] = useState(null)
   const tLabel = it.tipos.map((t) => `${TIPO_ICON[t]} ${TIPO_LABEL[t]}`).join(' + ')
   const p0 = it.precios[it.tipos[0]] || 0
   const coloresPresentes = ((it.colores && it.colores.length) ? it.colores : Object.keys(it.tabla || {})).filter((c) => it.tabla && it.tabla[c])
+
+  function confirmarEditor(cantidad) {
+    onToggle(it, it.id, editando.ek, cantidad)
+    setEditando(null)
+  }
 
   return (
     <div style={{ background: 'var(--loom)', border: '1px solid var(--jbd)', borderRadius: 9, padding: 12, marginBottom: 8 }}>
@@ -307,13 +334,21 @@ function ItemChaqView({ it, estadoPedido, onToggle, onPesaje, onImgClick, showTo
                     if (!n) return <td key={t} style={{ textAlign: 'center', color: '#ccc' }}>—</td>
                     totF += n
                     const ek = `${color}|${t}`
-                    const est = (it.estados || {})[ek]
+                    const valor = (it.estados || {})[ek]
+                    const clase = claseCelda(valor, n)
+                    const hecho = cantidadHecha(valor, n)
                     return (
-                      <td key={t} className={est === 'ok' ? 'st-ok' : est === 'falta' ? 'st-falta' : ''}>
-                        <div className="cell-estado">
+                      <td key={t} className={clase === 'ok' ? 'st-ok' : clase === 'parcial' ? 'st-parcial' : ''}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
                           <span className="cell-cant">{n}</span>
-                          <button className="cell-btn" title="Completo" onClick={() => onToggle(it, it.id, ek, 'ok')}>✅</button>
-                          <button className="cell-btn" title="Falta" onClick={() => onToggle(it, it.id, ek, 'falta')}>❓</button>
+                          <button
+                            type="button"
+                            className={`celda-etapa ${clase === 'ok' ? 'st-ok' : clase === 'parcial' ? 'st-parcial' : ''}`}
+                            title="Toca para marcar cuánto va"
+                            onClick={() => setEditando({ ek, n, etiqueta: `${TIPO_LABEL[t]} — ${color}`, valorActual: hecho })}
+                          >
+                            {clase === 'ok' ? '✅' : '📦'}{clase === 'parcial' ? ` faltan ${n - hecho}` : ''}
+                          </button>
                         </div>
                       </td>
                     )
@@ -347,6 +382,54 @@ function ItemChaqView({ it, estadoPedido, onToggle, onPesaje, onImgClick, showTo
       ) : it.kilos_reales ? (
         <div style={{ fontSize: 12, color: 'var(--thread)', marginTop: 6, fontWeight: 600 }}>✅ {it.kilos_reales} kg · {fmtCOP(it.total_final)}</div>
       ) : null}
+
+      <EditorCantidad info={editando} onCerrar={() => setEditando(null)} onConfirmar={confirmarEditor} />
+    </div>
+  )
+}
+
+// Modal compartido: edita cuántas unidades de UNA celda (una etapa de un
+// color/talla/tipo) están hechas. Abrir el modal es el "primer paso"
+// (tentativo, nada se guarda todavía); tocar "Guardar" es la confirmación
+// final que sí escribe el cambio — así un toque accidental en la tabla
+// nunca marca ni desmarca nada por sí solo.
+function EditorCantidad({ info, onCerrar, onConfirmar }) {
+  const [valor, setValor] = useState(0)
+  useEffect(() => { if (info) setValor(info.valorActual || 0) }, [info])
+  if (!info) return null
+  const { etiqueta, n } = info
+  const faltan = Math.max(0, n - valor)
+
+  return (
+    <div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) onCerrar() }}>
+      <div className="modal" style={{ maxWidth: 340 }}>
+        <div className="mtitle">{etiqueta}</div>
+        <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16 }}>Cantidad total de esta celda: <strong>{n}</strong></p>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginBottom: 12 }}>
+          <button type="button" className="btn btn-s" onClick={() => setValor((v) => Math.max(0, v - 1))}>−</button>
+          <input
+            type="number" min="0" max={n} value={valor}
+            onChange={(e) => setValor(Math.max(0, Math.min(n, parseInt(e.target.value) || 0)))}
+            style={{ width: 74, textAlign: 'center', fontSize: 22, fontWeight: 800, fontFamily: "'DM Mono', monospace", border: '1px solid var(--border)', borderRadius: 8, padding: '6px 4px' }}
+          />
+          <button type="button" className="btn btn-s" onClick={() => setValor((v) => Math.min(n, v + 1))}>＋</button>
+        </div>
+
+        <div style={{ textAlign: 'center', fontSize: 12, fontWeight: 700, marginBottom: 14, color: valor === 0 ? 'var(--muted)' : faltan === 0 ? 'var(--thread)' : 'var(--warn)' }}>
+          {valor === 0 ? 'Nada hecho todavía' : faltan === 0 ? '✅ Completo' : `Van ${valor} de ${n} — faltan ${faltan}`}
+        </div>
+
+        <div className="brow" style={{ justifyContent: 'center', gap: 8, marginBottom: 14 }}>
+          <button type="button" className="btn btn-s btn-sm" onClick={() => setValor(0)}>Nada</button>
+          <button type="button" className="btn btn-s btn-sm" onClick={() => setValor(n)}>✅ Completo</button>
+        </div>
+
+        <div className="brow right">
+          <button className="btn btn-s" onClick={onCerrar}>Cancelar</button>
+          <button className="btn btn-p" onClick={() => onConfirmar(valor)}>💾 Guardar</button>
+        </div>
+      </div>
     </div>
   )
 }
