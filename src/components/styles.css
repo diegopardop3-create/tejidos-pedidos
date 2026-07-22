@@ -167,19 +167,31 @@ td.st-parcial { background: #fff3cd; }
 /* Celda tocable de producción: ocupa todo el ancho de la celda para que sea
    fácil de dar en el celular. Un toque avanza de etapa; mantener presionado
    borra. El fondo indica en qué va sin necesidad de leer nada. */
+/* El botón ocupa TODO el cuadro de la celda (número incluido), así que se
+   puede tocar en cualquier parte y no hay que apuntarle a un ícono. */
+td.celda-td { padding: 2px; }
+.celda-wrap { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .celda-etapa {
-  display: flex; align-items: center; justify-content: center;
-  width: 100%; padding: 3px 4px; border-radius: 6px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 100%; min-height: 38px; padding: 4px 6px; border-radius: 6px;
   border: 1px solid var(--border); background: var(--white);
-  cursor: pointer; font-size: 13px; line-height: 1.1;
-  color: var(--muted); transition: background .15s, transform .1s;
+  cursor: pointer; line-height: 1.05;
+  transition: background .12s, border-color .12s, transform .08s;
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
-.celda-etapa:active { transform: scale(.94); }
-.celda-etapa.vacia { color: #c4c4c4; }
-.celda-etapa.tejido { background: #fff3cd; border-color: #e8c96a; }
-.celda-etapa.empacado { background: #4b8523; border-color: #4b8523; }
+.celda-etapa:active { transform: scale(.95); }
+.celda-num { font-family: 'DM Mono', monospace; font-weight: 700; font-size: 13px; color: var(--ink); }
+.celda-ico { font-size: 11px; line-height: 1; min-height: 11px; }
 
+/* Sin marcar */
+.celda-etapa.vacia { background: var(--white); }
+/* 1er toque: tejido — verde claro */
+.celda-etapa.tejido { background: #d8eecb; border-color: #9ccb7f; }
+.celda-etapa.tejido .celda-num { color: #2f5e18; }
+/* 2do toque: empacado — verde encendido */
+.celda-etapa.empacado { background: #4b8523; border-color: #3d6d1c; }
+.celda-etapa.empacado .celda-num { color: #fff; }
 /* Casilla para anotar cuántas faltan. Roja cuando tiene un número, para que
    salte a la vista qué quedó incompleto. */
 .casilla-faltan {
@@ -188,8 +200,6 @@ td.st-parcial { background: #fff3cd; }
   font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 700;
   text-align: center; background: var(--white); color: var(--muted); outline: none;
 }
-.casilla-faltan:focus { border-color: var(--thread); }
-.casilla-faltan.con-falta { border-color: #c0392b; background: #fdecea; color: #c0392b; }
 .falta-txt { font-size: 9px; font-weight: 800; color: #c0392b; font-family: 'DM Mono', monospace; }
 
 /* Botón que activa el modo faltantes (esquina de cada tabla). */
