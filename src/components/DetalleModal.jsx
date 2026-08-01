@@ -202,9 +202,10 @@ async function cambiarEstado(nuevoEstado) {
         {/* Panel de pagos */}
         <div className="msec" style={{ marginTop: 8 }}>
           <h4>💳 Pagos y Abonos</h4>
-          <PanelPagos
+      <PanelPagos
             pedido={pedido}
             onUpdated={onUpdated}
+            onCambioLocal={(cambios) => actualizarPedidoLocal?.(pedido.id, cambios)}
             showToast={showToast}
             compact={false}
           />
