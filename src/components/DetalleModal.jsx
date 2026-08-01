@@ -53,13 +53,20 @@ export default function DetalleModal({ pedido, onClose, onUpdated, actualizarPed
     // normalmente se registra al entregar.
     (esSoloCamiseta && pedido.estado === 'Listo')
 
-  async function cambiarEstado(nuevoEstado) {
+async function cambiarEstado(nuevoEstado) {
+    const anterior = { estado: pedido.estado, fecha_entregado: pedido.fecha_entregado }
     const cambios = { estado: nuevoEstado, actualizado_en: new Date().toISOString() }
     if (nuevoEstado === 'Entregado') cambios.fecha_entregado = new Date().toISOString().slice(0, 10)
-    const { error } = await supabase.from('pedidos').update(cambios).eq('id', pedido.id)
-    if (error) { showToast('⚠️', 'Error al cambiar estado'); return }
+
+    actualizarPedidoLocal?.(pedido.id, cambios)
     showToast(ESTADO_ICON[nuevoEstado], `Estado actualizado a ${nuevoEstado}`)
-    onUpdated()
+    huboCambios.current = true
+
+    const { error } = await supabase.from('pedidos').update(cambios).eq('id', pedido.id)
+    if (error) {
+      actualizarPedidoLocal?.(pedido.id, anterior)
+      showToast('⚠️', 'No se pudo guardar, revisa la conexión')
+    }
   }
 
   // Pinta el cambio de una vez y guarda en segundo plano. Si el guardado
