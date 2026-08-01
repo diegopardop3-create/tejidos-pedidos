@@ -14,7 +14,7 @@ function siguienteEtapa(actual) {
   return 'tejido'
 }
 
-export default function DetalleModal({ pedido, onClose, onUpdated, onEditar, onCompartir, showToast }) {
+export default function DetalleModal({ pedido, onClose, onUpdated, actualizarPedidoLocal, onEditar, onCompartir, showToast }) {
   const [lightbox, setLightbox] = useState(null)
   // Copia local de los estados de cada ítem. Al tocar una celda se actualiza
   // aquí de una vez (se ve instantáneo) y el guardado en la base va aparte,
