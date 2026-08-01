@@ -58,6 +58,15 @@ export default function Pedidos({ session }) {
     primeraCarga.current = false
   }, [showToast])
 
+  // Cambia solo los campos indicados de UN pedido en la lista que ya está
+  // en pantalla, sin pedir nada al servidor. Se usa para que cambiar un
+  // estado o registrar un pago se vea al instante — el guardado real en
+  // Supabase corre aparte; si falla, quien llamó a esto se encarga de
+  // devolver el valor anterior con la misma función.
+  const actualizarPedidoLocal = useCallback((id, cambios) => {
+    setPedidos((prev) => prev.map((p) => (p.id === id ? { ...p, ...cambios } : p)))
+  }, [])
+
   useEffect(() => {
     cargarPedidos()
   }, [cargarPedidos])
@@ -147,6 +156,7 @@ export default function Pedidos({ session }) {
             }}
             onCompartir={handleCompartir}
             refrescar={cargarPedidos}
+            actualizarPedidoLocal={actualizarPedidoLocal}
             onEliminar={(pedido) => setPedidoAEliminar(pedido)}
             showToast={showToast}
             titulo="Pedidos Activos"
@@ -163,6 +173,7 @@ export default function Pedidos({ session }) {
             }}
             onCompartir={handleCompartir}
             refrescar={cargarPedidos}
+            actualizarPedidoLocal={actualizarPedidoLocal}
             onEliminar={(pedido) => setPedidoAEliminar(pedido)}
             showToast={showToast}
             titulo="Pedidos Entregados"
@@ -182,6 +193,7 @@ export default function Pedidos({ session }) {
           pedido={pedidos[detalleIdx]}
           onClose={() => setDetalleIdx(null)}
           onUpdated={cargarPedidos}
+          actualizarPedidoLocal={actualizarPedidoLocal}
           onCompartir={handleCompartir}
           onEditar={() => {
             setEditPedido(pedidos[detalleIdx])
