@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 import NuevoPedido from './NuevoPedido'
 import ListaPedidos from './ListaPedidos'
@@ -18,6 +18,12 @@ export default function Pedidos({ session }) {
   const [editPedido, setEditPedido] = useState(null)
   const [toast, setToast] = useState(null)
   const [pedidoAEliminar, setPedidoAEliminar] = useState(null)
+  // Solo la PRIMERA carga muestra "Cargando…". Las siguientes veces que se
+  // vuelve a pedir la lista (después de marcar una celda, cambiar un estado,
+  // guardar un abono, etc.) se actualiza en segundo plano: la tabla que ya
+  // está en pantalla se queda visible y solo cambia cuando llegan los datos
+  // nuevos, sin taparla con la pantalla de carga.
+  const primeraCarga = useRef(true)
 
   const showToast = useCallback((icon, msg) => {
     setToast({ icon, msg })
@@ -25,7 +31,7 @@ export default function Pedidos({ session }) {
   }, [])
 
   const cargarPedidos = useCallback(async () => {
-    setLoading(true)
+    if (primeraCarga.current) setLoading(true)
     const { data: pedidosData, error } = await supabase
       .from('pedidos')
       .select('*, items_camiseta(*), items_chaqueta(*)')
@@ -34,6 +40,7 @@ export default function Pedidos({ session }) {
     if (error) {
       showToast('⚠️', 'Error cargando pedidos: ' + error.message)
       setLoading(false)
+      primeraCarga.current = false
       return
     }
     // Los abonos se traen en una consulta aparte (no anidada) y se suman por
@@ -48,6 +55,7 @@ export default function Pedidos({ session }) {
 
     setPedidos((pedidosData || []).map((p) => ({ ...p, total_abonado: abonadoPorPedido[p.id] || 0 })))
     setLoading(false)
+    primeraCarga.current = false
   }, [showToast])
 
   useEffect(() => {
