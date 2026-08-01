@@ -52,7 +52,7 @@ function unidadesChaqueta(items) {
   return partes.join(' · ')
 }
 
-export default function ListaPedidos({ pedidos, loading, onVerDetalle, onEliminar, onCompartir, showToast, refrescar, titulo = 'Pedidos', soloEntregados = false }) {
+export default function ListaPedidos({ pedidos, loading, onVerDetalle, onEliminar, onCompartir, showToast, refrescar, actualizarPedidoLocal, titulo = 'Pedidos', soloEntregados = false }) {
   const [busqueda, setBusqueda] = useState('')
   const [filEstado, setFilEstado] = useState('')
   const [abiertoPago, setAbiertoPago] = useState(null) // id del pedido con panel pago abierto
@@ -63,13 +63,23 @@ export default function ListaPedidos({ pedidos, loading, onVerDetalle, onElimina
     return match && me
   })
 
+  // Pinta el nuevo estado de una vez (el desplegable ya lo cambió solo en
+  // pantalla, pero el resto de la fila —badge, filtros— depende de esto) y
+  // guarda en Supabase en segundo plano. Si falla, se devuelve al estado
+  // anterior y se avisa, para no dejar la pantalla mintiendo.
   async function cambiarEstado(pedido, nuevoEstado) {
+    const anterior = { estado: pedido.estado, fecha_entregado: pedido.fecha_entregado }
     const cambios = { estado: nuevoEstado, actualizado_en: new Date().toISOString() }
     if (nuevoEstado === 'Entregado') cambios.fecha_entregado = new Date().toISOString().slice(0, 10)
-    const { error } = await supabase.from('pedidos').update(cambios).eq('id', pedido.id)
-    if (error) { showToast('⚠️', 'Error al cambiar estado'); return }
+
+    actualizarPedidoLocal?.(pedido.id, cambios)
     showToast(ESTADO_ICON[nuevoEstado], `Pedido ${pedido.numero} → ${nuevoEstado}`)
-    refrescar()
+
+    const { error } = await supabase.from('pedidos').update(cambios).eq('id', pedido.id)
+    if (error) {
+      actualizarPedidoLocal?.(pedido.id, anterior)
+      showToast('⚠️', 'No se pudo guardar, revisa la conexión')
+    }
   }
 
   function exportCSV() {
@@ -261,6 +271,7 @@ export default function ListaPedidos({ pedidos, loading, onVerDetalle, onElimina
                           <PanelPagos
                             pedido={p}
                             onUpdated={refrescar}
+                            onCambioLocal={(cambios) => actualizarPedidoLocal?.(p.id, cambios)}
                             showToast={showToast}
                             compact={false}
                           />
