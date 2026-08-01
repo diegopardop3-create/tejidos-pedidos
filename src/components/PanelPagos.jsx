@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import { fmtCOP, fmtFecha, PAGO_COLOR } from './constants'
 
-export default function PanelPagos({ pedido, onUpdated, showToast, compact = false }) {
+export default function PanelPagos({ pedido, onUpdated, onCambioLocal, showToast, compact = false }) {
   const [abonos, setAbonos] = useState([])
   const [monto, setMonto] = useState('')
   const [nota, setNota] = useState('')
@@ -33,9 +33,7 @@ export default function PanelPagos({ pedido, onUpdated, showToast, compact = fal
     setAbonos(data || [])
   }
 
-  async function actualizarEstadoPago(totalAbonadoNuevo) {
-    const nuevoEstado = totalAbonadoNuevo <= 0 ? 'Pendiente'
-      : totalAbonadoNuevo >= totalPedido ? 'Pagado' : 'Parcial'
+  async function actualizarEstadoPagoDB(nuevoEstado) {
     await supabase.from('pedidos').update({ estado_pago: nuevoEstado }).eq('id', pedido.id)
   }
 
@@ -45,29 +43,67 @@ export default function PanelPagos({ pedido, onUpdated, showToast, compact = fal
   const pct = totalPedido > 0 ? Math.min(100, Math.round((totalAbonado / totalPedido) * 100)) : 0
   const colorEstado = PAGO_COLOR[estadoPago]
 
+  function estadoDe(total) {
+    return total <= 0 ? 'Pendiente' : total >= totalPedido ? 'Pagado' : 'Parcial'
+  }
+
+  // Cada función de aquí en adelante sigue el mismo orden: pinta el cambio
+  // (en la lista de abonos de este panel y, con onCambioLocal, en la fila
+  // de la lista general) y DESPUÉS guarda en Supabase. Si el guardado
+  // falla, se devuelve todo a como estaba y se avisa — nunca se deja en
+  // pantalla un pago que en realidad no se guardó.
   async function registrarAbono() {
     const n = Math.round(parseFloat(monto) || 0)
     if (!n || n <= 0) { showToast('⚠️', 'Ingresa un monto válido'); return }
     setGuardando(true)
-    const { error } = await supabase.from('abonos').insert({
-      pedido_id: pedido.id, monto: n, nota: nota.trim() || null, fecha,
-    })
-    if (error) { showToast('⚠️', 'Error al registrar'); setGuardando(false); return }
-    await actualizarEstadoPago(totalAbonado + n)
+
+    const tempId = `tmp-${Date.now()}`
+    const notaVal = nota.trim() || null
+    const fechaVal = fecha
+    const totalNuevo = totalAbonado + n
+    const estadoNuevo = estadoDe(totalNuevo)
+
+    setAbonos((prev) => [{ id: tempId, pedido_id: pedido.id, monto: n, nota: notaVal, fecha: fechaVal }, ...prev])
+    onCambioLocal?.({ total_abonado: totalNuevo, estado_pago: estadoNuevo })
     setMonto(''); setNota(''); setFecha(new Date().toISOString().slice(0, 10))
-    setGuardando(false)
-    await cargarAbonos()
-    onUpdated?.()
     showToast('💰', `Abono de ${fmtCOP(n)} registrado`)
+
+    const { data, error } = await supabase.from('abonos')
+      .insert({ pedido_id: pedido.id, monto: n, nota: notaVal, fecha: fechaVal })
+      .select().single()
+
+    if (error) {
+      setAbonos((prev) => prev.filter((a) => a.id !== tempId))
+      onCambioLocal?.({ total_abonado: totalAbonado, estado_pago: estadoPago })
+      showToast('⚠️', 'No se pudo guardar, revisa la conexión')
+      setGuardando(false)
+      return
+    }
+    setAbonos((prev) => prev.map((a) => (a.id === tempId ? data : a)))
+    await actualizarEstadoPagoDB(estadoNuevo)
+    setGuardando(false)
   }
 
   async function eliminarAbono(id, montoAbono) {
     if (!confirm(`¿Eliminar este abono de ${fmtCOP(montoAbono)}?`)) return
-    await supabase.from('abonos').delete().eq('id', id)
-    await actualizarEstadoPago(totalAbonado - montoAbono)
-    await cargarAbonos()
-    onUpdated?.()
+    const abonosPrevios = abonos
+    const totalPrevio = totalAbonado
+    const estadoPrevio = estadoPago
+    const totalNuevo = totalAbonado - montoAbono
+    const estadoNuevo = estadoDe(totalNuevo)
+
+    setAbonos((prev) => prev.filter((a) => a.id !== id))
+    onCambioLocal?.({ total_abonado: totalNuevo, estado_pago: estadoNuevo })
     showToast('🗑️', 'Abono eliminado')
+
+    const { error } = await supabase.from('abonos').delete().eq('id', id)
+    if (error) {
+      setAbonos(abonosPrevios)
+      onCambioLocal?.({ total_abonado: totalPrevio, estado_pago: estadoPrevio })
+      showToast('⚠️', 'No se pudo eliminar, revisa la conexión')
+      return
+    }
+    await actualizarEstadoPagoDB(estadoNuevo)
   }
 
   function abrirEdicion(a) {
@@ -81,16 +117,27 @@ export default function PanelPagos({ pedido, onUpdated, showToast, compact = fal
   async function guardarEdicion(abonoAnterior) {
     const n = Math.round(parseFloat(editMonto) || 0)
     if (!n || n <= 0) { showToast('⚠️', 'Ingresa un monto válido'); return }
-    const { error } = await supabase.from('abonos').update({
-      monto: n, nota: editNota.trim() || null, fecha: editFecha,
-    }).eq('id', editId)
-    if (error) { showToast('⚠️', 'Error al actualizar'); return }
-    const nuevoTotal = totalAbonado - abonoAnterior.monto + n
-    await actualizarEstadoPago(nuevoTotal)
+    const abonosPrevios = abonos
+    const totalPrevio = totalAbonado
+    const estadoPrevio = estadoPago
+    const notaVal = editNota.trim() || null
+    const fechaVal = editFecha
+    const totalNuevo = totalAbonado - abonoAnterior.monto + n
+    const estadoNuevo = estadoDe(totalNuevo)
+
+    setAbonos((prev) => prev.map((a) => (a.id === editId ? { ...a, monto: n, nota: notaVal, fecha: fechaVal } : a)))
+    onCambioLocal?.({ total_abonado: totalNuevo, estado_pago: estadoNuevo })
     setEditId(null)
-    await cargarAbonos()
-    onUpdated?.()
     showToast('✅', 'Abono actualizado')
+
+    const { error } = await supabase.from('abonos').update({ monto: n, nota: notaVal, fecha: fechaVal }).eq('id', editId)
+    if (error) {
+      setAbonos(abonosPrevios)
+      onCambioLocal?.({ total_abonado: totalPrevio, estado_pago: estadoPrevio })
+      showToast('⚠️', 'No se pudo guardar, revisa la conexión')
+      return
+    }
+    await actualizarEstadoPagoDB(estadoNuevo)
   }
 
   async function marcarPagado() {
@@ -98,14 +145,26 @@ export default function PanelPagos({ pedido, onUpdated, showToast, compact = fal
     if (restante <= 0) { showToast('ℹ️', 'Ya está pagado'); return }
     if (!confirm(`¿Registrar pago del saldo restante (${fmtCOP(restante)})?`)) return
     setGuardando(true)
-    await supabase.from('abonos').insert({
-      pedido_id: pedido.id, monto: restante, nota: 'Pago total', fecha,
-    })
-    await supabase.from('pedidos').update({ estado_pago: 'Pagado' }).eq('id', pedido.id)
-    setGuardando(false)
-    await cargarAbonos()
-    onUpdated?.()
+
+    const tempId = `tmp-${Date.now()}`
+    setAbonos((prev) => [{ id: tempId, pedido_id: pedido.id, monto: restante, nota: 'Pago total', fecha }, ...prev])
+    onCambioLocal?.({ total_abonado: totalPedido, estado_pago: 'Pagado' })
     showToast('✅', '¡Pedido marcado como pagado!')
+
+    const { data, error } = await supabase.from('abonos')
+      .insert({ pedido_id: pedido.id, monto: restante, nota: 'Pago total', fecha })
+      .select().single()
+
+    if (error) {
+      setAbonos((prev) => prev.filter((a) => a.id !== tempId))
+      onCambioLocal?.({ total_abonado: totalAbonado, estado_pago: estadoPago })
+      showToast('⚠️', 'No se pudo guardar, revisa la conexión')
+      setGuardando(false)
+      return
+    }
+    setAbonos((prev) => prev.map((a) => (a.id === tempId ? data : a)))
+    await actualizarEstadoPagoDB('Pagado')
+    setGuardando(false)
   }
 
   const inp = {
