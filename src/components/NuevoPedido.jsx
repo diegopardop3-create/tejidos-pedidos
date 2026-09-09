@@ -25,12 +25,23 @@ function splitColorNombre(nombre) {
   return { principal: partes[0], rayas: partes.slice(1) }
 }
 
+// Guarda un borrador del pedido que se está armando (todo menos las fotos,
+// que pesan demasiado para el espacio de guardado del navegador). Así, si
+// el navegador se cierra o se cuelga antes de darle "Guardar Pedido", al
+// volver a abrir la app se puede ofrecer recuperarlo.
+const BORRADOR_KEY = 'tejidos_borrador_pedido'
+
+function sinImagenes(items) {
+  return (items || []).map((it) => ({ ...it, imagenes: [] }))
+}
+
 export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit, showToast, userId }) {
   const [cliente, setCliente] = useState('')
   const [fecha, setFecha] = useState(hoy())
   const [estado, setEstado] = useState('Pendiente')
   const [obs, setObs] = useState('')
   const [numPedido, setNumPedido] = useState('')
+  const [borradorDetectado, setBorradorDetectado] = useState(null)
 
   const [openCam, setOpenCam] = useState(true)
   const [openChaq, setOpenChaq] = useState(true)
@@ -77,6 +88,54 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
     }
   }, [editPedido, pedidos])
 
+  // Al entrar a la pantalla (y solo si no se está editando un pedido ya
+  // existente), revisa si quedó un borrador de una sesión anterior sin
+  // terminar. Se revisa una sola vez, no cada vez que cambian los pedidos.
+  useEffect(() => {
+    if (editPedido) return
+    try {
+      const guardado = localStorage.getItem(BORRADOR_KEY)
+      if (!guardado) return
+      const b = JSON.parse(guardado)
+      const hayAlgo = (b.cliente || '').trim() || (b.obs || '').trim() || (b.tempCam || []).length || (b.tempChaq || []).length
+      if (hayAlgo) setBorradorDetectado(b)
+    } catch { /* borrador corrupto o ilegible: se ignora, no rompe la pantalla */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Guarda un borrador cada vez que cambia algo del pedido que se está
+  // armando (mientras NO se esté editando uno ya existente — ese ya vive
+  // en la base de datos y no necesita borrador aparte). Las fotos se dejan
+  // fuera a propósito: pesan demasiado para el espacio del navegador.
+  useEffect(() => {
+    if (editPedido) return
+    const hayAlgo = cliente.trim() || obs.trim() || tempCam.length || tempChaq.length
+    if (!hayAlgo) { localStorage.removeItem(BORRADOR_KEY); return }
+    try {
+      localStorage.setItem(BORRADOR_KEY, JSON.stringify({
+        cliente, fecha, estado, obs,
+        tempCam: sinImagenes(tempCam), tempChaq: sinImagenes(tempChaq),
+      }))
+    } catch { /* si el espacio del navegador está lleno, seguimos sin borrador esta vez */ }
+  }, [editPedido, cliente, fecha, estado, obs, tempCam, tempChaq])
+
+  function recuperarBorrador() {
+    if (!borradorDetectado) return
+    setCliente(borradorDetectado.cliente || '')
+    if (borradorDetectado.fecha) setFecha(borradorDetectado.fecha)
+    if (borradorDetectado.estado) setEstado(borradorDetectado.estado)
+    setObs(borradorDetectado.obs || '')
+    setTempCam(borradorDetectado.tempCam || [])
+    setTempChaq(borradorDetectado.tempChaq || [])
+    setBorradorDetectado(null)
+    showToast('📋', 'Borrador recuperado — las fotos no se guardan en el borrador, revisa si hace falta volver a agregarlas')
+  }
+
+  function descartarBorrador() {
+    localStorage.removeItem(BORRADOR_KEY)
+    setBorradorDetectado(null)
+  }
+
   function resetItemForms() {
     setCamSelTipos(new Set()); setCamCols([{ principal: '', rayas: [] }]); setCamCants({}); setCamDiseno(''); setCamPrecios({}); setCamImgs([]); setCamEsJuego(false); setCamEditIdx(null); setCamTallasSel(new Set()); setCamPunoSinDividir(false)
     setChaqSelTipos(new Set()); setChaqRows([{ principal: '', rayas: [] }]); setChaqCants({}); setChaqDiseno(''); setChaqPrecios({}); setChaqImgs([]); setChaqEditIdx(null)
@@ -94,6 +153,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
     setCliente(''); setFecha(hoy()); setEstado('Pendiente'); setObs('')
     setTempCam([]); setTempChaq([])
     resetItemForms()
+    localStorage.removeItem(BORRADOR_KEY)
     if (editPedido) onCancelEdit()
   }
 
@@ -418,14 +478,37 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
 
   const totalCam = tempCam.reduce((s, it) => s + it.total_precio, 0)
   const hayItemsTemp = tempCam.length > 0 || tempChaq.length > 0
+  // Nombres de clientes que ya han pedido antes, para sugerirlos al escribir
+  // en el campo Cliente — así no hay que recordar cómo se escribió cada vez.
+  const clientesExistentes = [...new Set((pedidos || []).map((p) => p.cliente).filter(Boolean))].sort()
 
   return (
     <div className="card">
       <div className="ctitle">{editPedido ? `Editando Pedido ${editPedido.numero}` : 'Registrar Nuevo Pedido'}</div>
 
+      {borradorDetectado && (
+        <div style={{ background: '#fff3cd', border: '1px solid #e8c96a', borderRadius: 9, padding: '12px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ fontSize: 13 }}>
+            <strong>📋 Tienes un borrador sin terminar</strong>
+            <div style={{ fontSize: 12, color: '#6a5010', marginTop: 3 }}>
+              {borradorDetectado.cliente ? `Cliente: ${borradorDetectado.cliente} · ` : ''}
+              {(borradorDetectado.tempCam?.length || 0) + (borradorDetectado.tempChaq?.length || 0)} ítem(s) añadido(s) — las fotos no quedaron en el borrador.
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <button className="btn btn-s btn-sm" onClick={descartarBorrador}>Descartar</button>
+            <button className="btn btn-p btn-sm" onClick={recuperarBorrador}>Recuperar</button>
+          </div>
+        </div>
+      )}
+
       <div className="g5" style={{ marginBottom: 20 }}>
         <div className="fld"><label>N° Pedido</label><input className="rinp" readOnly value={numPedido} /></div>
-        <div className="fld"><label>Cliente *</label><input value={cliente} onChange={(e) => setCliente(e.target.value)} placeholder="Nombre del cliente" /></div>
+        <div className="fld"><label>Cliente *</label><input value={cliente} onChange={(e) => setCliente(e.target.value)} placeholder="Nombre del cliente" list="clientes-existentes" />
+          <datalist id="clientes-existentes">
+            {clientesExistentes.map((c) => <option key={c} value={c} />)}
+          </datalist>
+        </div>
         <div className="fld"><label>Fecha *</label><input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} /></div>
         <div className="fld">
           <label>Estado</label>
