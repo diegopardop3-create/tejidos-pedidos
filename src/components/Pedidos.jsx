@@ -130,7 +130,12 @@ export default function Pedidos({ session }) {
           </button>
         </div>
 
-        {tab === 'nuevo' && (
+                {/* Se mantiene SIEMPRE montado (solo se esconde con display:none) en
+            vez de crearlo y destruirlo con cada cambio de pestaña. Antes,
+            cambiar a Activos u otra pestaña mientras se armaba un pedido
+            nuevo borraba todo lo que llevabas — ahora el formulario sigue
+            vivo en memoria y lo encuentras tal como lo dejaste. */}
+        <div style={{ display: tab === 'nuevo' ? 'block' : 'none' }}>
           <NuevoPedido
             pedidos={pedidos}
             editPedido={editPedido}
@@ -144,7 +149,7 @@ export default function Pedidos({ session }) {
             showToast={showToast}
             userId={session.user.id}
           />
-        )}
+        </div>
 
         {tab === 'lista' && (
           <ListaPedidos
