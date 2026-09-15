@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 import { TALLAS, TALLA_SIN_DIVIDIR, TIPO_LABEL, TIPO_ICON, hoy, ESTADOS, ESTADO_ICON, fmtCOP, totalesPorTipoCam, ordenarTipos } from './constants'
 import ColorSwatch from './ColorSwatch'
@@ -42,6 +42,8 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
   const [obs, setObs] = useState('')
   const [numPedido, setNumPedido] = useState('')
   const [borradorDetectado, setBorradorDetectado] = useState(null)
+  const [sugerenciasAbiertas, setSugerenciasAbiertas] = useState(false)
+  const cajaClienteRef = useRef(null)
 
   const [openCam, setOpenCam] = useState(true)
   const [openChaq, setOpenChaq] = useState(true)
@@ -135,6 +137,14 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
     localStorage.removeItem(BORRADOR_KEY)
     setBorradorDetectado(null)
   }
+
+  useEffect(() => {
+    function alTocarFuera(e) {
+      if (cajaClienteRef.current && !cajaClienteRef.current.contains(e.target)) setSugerenciasAbiertas(false)
+    }
+    document.addEventListener('mousedown', alTocarFuera)
+    return () => document.removeEventListener('mousedown', alTocarFuera)
+  }, [])
 
   function resetItemForms() {
     setCamSelTipos(new Set()); setCamCols([{ principal: '', rayas: [] }]); setCamCants({}); setCamDiseno(''); setCamPrecios({}); setCamImgs([]); setCamEsJuego(false); setCamEditIdx(null); setCamTallasSel(new Set()); setCamPunoSinDividir(false)
@@ -481,6 +491,9 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
   // Nombres de clientes que ya han pedido antes, para sugerirlos al escribir
   // en el campo Cliente — así no hay que recordar cómo se escribió cada vez.
   const clientesExistentes = [...new Set((pedidos || []).map((p) => p.cliente).filter(Boolean))].sort()
+  const sugerenciasCliente = cliente.trim()
+    ? clientesExistentes.filter((c) => c.toLowerCase().includes(cliente.trim().toLowerCase()) && c !== cliente).slice(0, 8)
+    : clientesExistentes.slice(0, 8)
 
   return (
     <div className="card">
@@ -504,10 +517,29 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
 
       <div className="g5" style={{ marginBottom: 20 }}>
         <div className="fld"><label>N° Pedido</label><input className="rinp" readOnly value={numPedido} /></div>
-        <div className="fld"><label>Cliente *</label><input value={cliente} onChange={(e) => setCliente(e.target.value)} placeholder="Nombre del cliente" list="clientes-existentes" />
-          <datalist id="clientes-existentes">
-            {clientesExistentes.map((c) => <option key={c} value={c} />)}
-          </datalist>
+        <div className="fld" ref={cajaClienteRef} style={{ position: 'relative' }}>
+          <label>Cliente *</label>
+          <input
+            value={cliente}
+            onChange={(e) => { setCliente(e.target.value); setSugerenciasAbiertas(true) }}
+            onFocus={() => setSugerenciasAbiertas(true)}
+            placeholder="Nombre del cliente"
+            autoComplete="off"
+          />
+          {sugerenciasAbiertas && sugerenciasCliente.length > 0 && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 30, background: '#fff', border: '1px solid var(--border)', borderRadius: 8, marginTop: 4, maxHeight: 200, overflowY: 'auto', boxShadow: '0 6px 20px rgba(0,0,0,.15)' }}>
+              {sugerenciasCliente.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => { setCliente(c); setSugerenciasAbiertas(false) }}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px', background: 'none', border: 'none', borderBottom: '1px solid var(--border)', cursor: 'pointer', fontSize: 13 }}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="fld"><label>Fecha *</label><input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} /></div>
         <div className="fld">
