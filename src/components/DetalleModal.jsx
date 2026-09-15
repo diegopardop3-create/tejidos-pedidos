@@ -14,34 +14,11 @@ function siguienteEtapa(actual) {
   return 'tejido'
 }
 
-export default function DetalleModal({ pedido, onClose, onUpdated, actualizarPedidoLocal, onEditar, onCompartir, showToast }) {
+export default function DetalleModal({ pedido, onClose, onUpdated, actualizarPedidoLocal, actualizarItemLocal, onEditar, onCompartir, showToast }) {
   const [lightbox, setLightbox] = useState(null)
-  // Copia local de los estados de cada ítem. Al tocar una celda se actualiza
-  // aquí de una vez (se ve instantáneo) y el guardado en la base va aparte,
-  // en segundo plano. Antes cada toque recargaba TODOS los pedidos con sus
-  // ítems y abonos, y por eso demoraba varios segundos en pintarse.
-  const [estadosLocal, setEstadosLocal] = useState({})
-  const huboCambios = useRef(false)
   if (!pedido) return null
 
-  const estadosDe = (item) => estadosLocal[item.id] ?? item.estados ?? {}
-
-  // Versión del pedido con los estados que se ven en pantalla ahora mismo,
-  // para que la barra de progreso también se mueva al instante.
-  const pedidoVivo = {
-    ...pedido,
-    items_camiseta: (pedido.items_camiseta || []).map((it) => ({ ...it, estados: estadosDe(it) })),
-    items_chaqueta: (pedido.items_chaqueta || []).map((it) => ({ ...it, estados: estadosDe(it) })),
-  }
-
-  // Al cerrar sí refrescamos la lista una sola vez, para que afuera se vea
-  // el progreso actualizado.
-  function cerrar() {
-    if (huboCambios.current) onUpdated()
-    onClose()
-  }
-
-  const pr = calcProgreso(pedidoVivo)
+  const pr = calcProgreso(pedido)
   const esSoloCamiseta = (pedido.items_camiseta || []).length > 0 && (pedido.items_chaqueta || []).length === 0
   const pedidoCompleto = pedido.estado === 'Entregado' ||
     (pr.total > 0 && pr.ok === pr.total) ||
@@ -60,7 +37,6 @@ async function cambiarEstado(nuevoEstado) {
 
     actualizarPedidoLocal?.(pedido.id, cambios)
     showToast(ESTADO_ICON[nuevoEstado], `Estado actualizado a ${nuevoEstado}`)
-    huboCambios.current = true
 
     const { error } = await supabase.from('pedidos').update(cambios).eq('id', pedido.id)
     if (error) {
@@ -69,19 +45,22 @@ async function cambiarEstado(nuevoEstado) {
     }
   }
 
-  // Pinta el cambio de una vez y guarda en segundo plano. Si el guardado
-  // falla, se devuelve la celda a como estaba y se avisa — así nunca queda
-  // marcada en pantalla algo que no alcanzó a guardarse.
+  // Pinta el cambio en la lista de pedidos que ya está en pantalla (para que
+  // se vea al instante en cualquier parte de la app) y guarda en Supabase en
+  // segundo plano. Si falla, se devuelve el valor anterior y se avisa.
+  // IMPORTANTE: ya NO se recarga toda la lista al cerrar el pedido — eso era
+  // lo que hacía que una marca reciente pareciera "perderse": si la recarga
+  // llegaba antes de que el guardado terminara de viajar por la red, traía
+  // de vuelta el dato viejo y lo pisaba encima del nuevo.
   async function persistir(item, estados) {
-    const anterior = estadosDe(item)
-    setEstadosLocal((prev) => ({ ...prev, [item.id]: estados }))
-    huboCambios.current = true
     const esCam = (pedido.items_camiseta || []).some((x) => x.id === item.id)
+    actualizarItemLocal?.(pedido.id, item.id, esCam, estados)
+
     const { error } = await supabase
       .from(esCam ? 'items_camiseta' : 'items_chaqueta')
       .update({ estados }).eq('id', item.id)
     if (error) {
-      setEstadosLocal((prev) => ({ ...prev, [item.id]: anterior }))
+      actualizarItemLocal?.(pedido.id, item.id, esCam, item.estados || {})
       showToast('⚠️', 'No se pudo guardar, revisa la conexión')
     }
   }
@@ -90,7 +69,7 @@ async function cambiarEstado(nuevoEstado) {
   // las claves de los formatos viejos ('|tejido' y '|revisado'); si no, la
   // marca antigua reaparecería y la celda no se vería vacía.
   function guardarEtapa(item, base, etapa) {
-    const estados = { ...estadosDe(item) }
+    const estados = { ...(item.estados || {}) }
     delete estados[`${base}|tejido`]
     delete estados[`${base}|revisado`]
     if (etapa) estados[base] = etapa
@@ -100,7 +79,7 @@ async function cambiarEstado(nuevoEstado) {
 
   // Guarda cuántas unidades faltan de una celda (0 = no falta nada, se borra).
   function guardarFaltan(item, base, n) {
-    const estados = { ...estadosDe(item) }
+    const estados = { ...(item.estados || {}) }
     if (n > 0) estados[`${base}|faltan`] = n
     else delete estados[`${base}|faltan`]
     persistir(item, estados)
@@ -129,7 +108,7 @@ async function cambiarEstado(nuevoEstado) {
   }
 
   return (
-    <div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) cerrar() }}>
+    <div className="overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className="modal">
         <div className="mtitle">Pedido {pedido.numero} — {pedido.cliente}</div>
 
@@ -168,7 +147,7 @@ async function cambiarEstado(nuevoEstado) {
           <div className="msec">
             <h4>👔 Camiseta — {pedido.items_camiseta.length} ítem(s)</h4>
             {pedido.items_camiseta.map((it, idx) => (
-              <ItemCamView key={it.id} it={it} estados={estadosDe(it)} itemIndice={idx} onEtapa={guardarEtapa} onFaltan={guardarFaltan} onImgClick={setLightbox} showToast={showToast} pedidoId={pedido.id} />
+              <ItemCamView key={it.id} it={it} estados={it.estados || {}} itemIndice={idx} onEtapa={guardarEtapa} onFaltan={guardarFaltan} onImgClick={setLightbox} showToast={showToast} pedidoId={pedido.id} />
             ))}
           </div>
         )}
@@ -177,13 +156,13 @@ async function cambiarEstado(nuevoEstado) {
           <div className="msec">
             <h4>🧥 Chaqueta — {pedido.items_chaqueta.length} ítem(s)</h4>
             {pedido.items_chaqueta.map((it, idx) => (
-              <ItemChaqView key={it.id} it={it} estados={estadosDe(it)} itemIndice={idx} estadoPedido={pedido.estado} onEtapa={guardarEtapa} onFaltan={guardarFaltan} onPesaje={guardarPesaje} onImgClick={setLightbox} showToast={showToast} pedidoId={pedido.id} />
+              <ItemChaqView key={it.id} it={it} estados={it.estados || {}} itemIndice={idx} estadoPedido={pedido.estado} onEtapa={guardarEtapa} onFaltan={guardarFaltan} onPesaje={guardarPesaje} onImgClick={setLightbox} showToast={showToast} pedidoId={pedido.id} />
             ))}
           </div>
         )}
 
         <div className="brow right">
-          <button className="btn btn-s" onClick={cerrar}>Cerrar</button>
+          <button className="btn btn-s" onClick={onClose}>Cerrar</button>
           <button className="btn btn-s" onClick={() => imprimirEtiqueta(pedido)}>🏷️ Etiqueta</button>
           <button className="btn btn-s" onClick={() => onCompartir(pedido)}>🔗 Compartir con cliente</button>
           {pedidoCompleto && (
