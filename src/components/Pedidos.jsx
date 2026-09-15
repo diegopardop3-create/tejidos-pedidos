@@ -67,6 +67,17 @@ export default function Pedidos({ session }) {
     setPedidos((prev) => prev.map((p) => (p.id === id ? { ...p, ...cambios } : p)))
   }, [])
 
+  // Igual que arriba, pero para un ÍTEM dentro de un pedido (ej. los estados
+  // de producción de una celda). Cambia solo ese ítem, dentro de la lista
+  // camiseta o chaqueta que le corresponda, sin tocar nada más.
+  const actualizarItemLocal = useCallback((pedidoId, itemId, esCamiseta, estados) => {
+    setPedidos((prev) => prev.map((p) => {
+      if (p.id !== pedidoId) return p
+      const campo = esCamiseta ? 'items_camiseta' : 'items_chaqueta'
+      return { ...p, [campo]: (p[campo] || []).map((it) => (it.id === itemId ? { ...it, estados } : it)) }
+    }))
+  }, [])
+
   useEffect(() => {
     cargarPedidos()
   }, [cargarPedidos])
@@ -199,6 +210,7 @@ export default function Pedidos({ session }) {
           onClose={() => setDetalleIdx(null)}
           onUpdated={cargarPedidos}
           actualizarPedidoLocal={actualizarPedidoLocal}
+          actualizarItemLocal={actualizarItemLocal}
           onCompartir={handleCompartir}
           onEditar={() => {
             setEditPedido(pedidos[detalleIdx])
