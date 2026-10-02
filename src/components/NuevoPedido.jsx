@@ -4,6 +4,37 @@ import { TALLAS, TALLA_SIN_DIVIDIR, TIPO_LABEL, TIPO_ICON, hoy, ESTADOS, ESTADO_
 import ColorSwatch from './ColorSwatch'
 import FormulaColorBoton from './FormulaColorBoton'
 
+// Reduce una foto (archivo) a máx. 1200 px y la devuelve como texto base64
+// JPEG. Si algo falla (formato raro), devuelve la foto original sin tocar.
+const FOTO_MAX = 1200
+function comprimirFoto(archivo) {
+  const original = () => new Promise((res) => {
+    const r = new FileReader()
+    r.onload = (ev) => res(ev.target.result)
+    r.readAsDataURL(archivo)
+  })
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(archivo)
+    const img = new Image()
+    img.onload = () => {
+      try {
+        const esc = Math.min(1, FOTO_MAX / Math.max(img.width, img.height))
+        const c = document.createElement('canvas')
+        c.width = Math.round(img.width * esc)
+        c.height = Math.round(img.height * esc)
+        const ctx = c.getContext('2d')
+        ctx.fillStyle = '#fff'
+        ctx.fillRect(0, 0, c.width, c.height)
+        ctx.drawImage(img, 0, 0, c.width, c.height)
+        URL.revokeObjectURL(url)
+        resolve(c.toDataURL('image/jpeg', 0.75))
+      } catch { URL.revokeObjectURL(url); original().then(resolve) }
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); original().then(resolve) }
+    img.src = url
+  })
+}
+
 const TIPOS_CAM = ['puno', 'cuello']
 const TIPOS_CHAQ = ['pretina', 'cuello', 'puno']
 
@@ -234,13 +265,12 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
 
   function handleImgs(e, sec) {
     const files = Array.from(e.target.files)
-    files.forEach((f) => {
-      const reader = new FileReader()
-      reader.onload = (ev) => {
-        if (sec === 'cam') setCamImgs((p) => [...p, ev.target.result])
-        else setChaqImgs((p) => [...p, ev.target.result])
-      }
-      reader.readAsDataURL(f)
+    files.forEach(async (f) => {
+      // Se reduce la foto antes de guardarla (máx. 1200 px, JPEG calidad 0.75):
+      // pasa de varios MB a ~100-200 KB sin que se note.
+      const data = await comprimirFoto(f)
+      if (sec === 'cam') setCamImgs((p) => [...p, data])
+      else setChaqImgs((p) => [...p, data])
     })
   }
 
