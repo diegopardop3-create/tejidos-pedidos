@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
-import { TIPO_LABEL, TIPO_ICON, fmtFecha, fmtCOP, calcProgreso, etapaCelda, faltanCelda, ESTADOS, ESTADO_ICON, TALLAS, TALLA_SIN_DIVIDIR, totalesPorTipoCam } from './constants'
+import { TIPO_LABEL, TIPO_ICON, fmtFecha, fmtCOP, calcProgreso, etapaCelda, faltanCelda, ESTADOS, ESTADO_ICON, TALLAS, TALLA_SIN_DIVIDIR, totalesPorTipoCam, tallasDeTabla } from './constants'
 import { generarFacturaPDF, generarFacturaMini, imprimirEtiqueta } from './factura'
 import PanelPagos from './PanelPagos'
 import { InsigniaTipos, InsigniaJuego } from './Insignias'
@@ -284,7 +284,7 @@ function ItemCamView({ it, estados, itemIndice, onEtapa, onFaltan, onImgClick, s
     })
     return list
   })()
-  const tallasPresentes = TALLAS.filter((t) => it.tabla && it.tabla[t])
+  const tallasPresentes = tallasDeTabla(it.tabla)
   if (it.tabla && it.tabla[TALLA_SIN_DIVIDIR]) tallasPresentes.push(TALLA_SIN_DIVIDIR)
 
   return (
