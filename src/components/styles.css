@@ -478,7 +478,7 @@ tbody td { padding: 10px 13px; vertical-align: middle; }
 .rs-atender .monto { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--danger); white-space: nowrap; }
 .rs-vacio { padding: 22px 18px; color: var(--muted); font-size: 13px; text-align: center; }
 .rs-graf { padding: 14px 18px; }
-.rs-graf svg { width: 100%; height: auto; display: block; }
+.rs-graf svg { width: 100%; max-width: 560px; height: auto; display: block; margin: 0 auto; }
 .rs-graf text { font-family: 'DM Mono', monospace; font-size: 10px; fill: var(--muted); }
 .rs-graf text.on { fill: var(--ink); font-weight: 500; }
 .rs-graf .barra { cursor: pointer; }
