@@ -38,7 +38,7 @@ export default function VistaPublica({ token }) {
         <div style={styles.card}>
           <img src={logo} alt="" style={{ height: 70, marginBottom: 16 }} />
           <p style={{ color: '#c0392b', fontWeight: 600 }}>No se encontró este pedido.</p>
-          <p style={{ color: '#6a7d5a', fontSize: 13, marginTop: 6 }}>Verifica el enlace o contacta a Tejidos y Confecciones Laura Lizeth.</p>
+          <p style={{ color: '#6a7d5a', fontSize: 13, marginTop: 6 }}>Verifica el enlace o contacta a L & L Tejidos y Confecciones.</p>
         </div>
       </div>
     )
@@ -157,7 +157,7 @@ export default function VistaPublica({ token }) {
           </div>
         )}
 
-        <div style={styles.footer}>Tejidos y Confecciones Laura Lizeth</div>
+        <div style={styles.footer}>L & L Tejidos y Confecciones</div>
       </div>
     </div>
   )
