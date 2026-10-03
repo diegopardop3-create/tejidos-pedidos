@@ -146,10 +146,8 @@ export default function Pedidos({ session }) {
       <header className="hdr">
         <div className="hdr-in">
           <div className="hdr-fila">
-            {/* Del logo completo se muestra solo el tejido con las agujas,
-                recortado con background-position para que se lea en pequeño. */}
+            {/* Logo completo de L & L, recortado a su zona útil. */}
             <div className="hsello" style={{ backgroundImage: `url(${logo})` }} role="img" aria-label="Logo de L & L Tejidos y Confecciones" />
-            <div className="hmarca">L &amp; L<small>Tejidos y Confecciones</small></div>
             <div className="huser">
               <span className="huser-mail">{session.user.email}</span>
               <button className="logout-btn" onClick={handleLogout}>Salir</button>
