@@ -77,7 +77,7 @@ export default async function handler(req, res) {
       html: `<p>Hola,</p>
              <p>Adjunto el reporte de pedidos entregados de <strong>${MESES[mes]} ${anio}</strong>.</p>
              <p>Total de pedidos: <strong>${(pedidos || []).length}</strong></p>
-             <p style="color:#6a7d5a;font-size:12px">Tejidos y Confecciones Laura Lizeth — reporte generado automáticamente.</p>`,
+             <p style="color:#6a7d5a;font-size:12px">L & L Tejidos y Confecciones — reporte generado automáticamente.</p>`,
       attachments: [{ filename: nombreArchivo, content: Buffer.from(buffer).toString('base64') }],
     })
 
@@ -103,7 +103,7 @@ async function validarUsuario(req) {
 
 function construirExcel(pedidos, mes, anio) {
   const wb = new ExcelJS.Workbook()
-  wb.creator = 'Tejidos y Confecciones Laura Lizeth'
+  wb.creator = 'L & L Tejidos y Confecciones'
 
   // ============ HOJA 1: RESUMEN ============
   const resumen = wb.addWorksheet(`Resumen ${MESES[mes]} ${anio}`)
