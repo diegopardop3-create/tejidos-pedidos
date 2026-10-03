@@ -168,25 +168,25 @@ export default function PanelPagos({ pedido, onUpdated, onCambioLocal, showToast
   }
 
   const inp = {
-    padding: '7px 10px', border: '1px solid #dde3d2', borderRadius: 7,
-    fontSize: 13, background: '#f5f2e7', outline: 'none', width: '100%',
+    padding: '7px 10px', border: '1px solid var(--border)', borderRadius: 7,
+    fontSize: 13, background: 'var(--loom)', outline: 'none', width: '100%',
   }
   const lbl = {
-    fontSize: 10, color: '#6a7d5a', fontFamily: "'DM Mono', monospace",
+    fontSize: 10, color: 'var(--muted)', fontFamily: "'DM Mono', monospace",
     textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 3, display: 'block',
   }
 
   return (
     <div style={{
       border: `1px solid ${colorEstado}30`, borderRadius: 10,
-      background: estadoPago === 'Pagado' ? '#f1f6ec' : estadoPago === 'Parcial' ? '#fffbf0' : '#fdf8ee',
+      background: estadoPago === 'Pagado' ? 'var(--cbg)' : 'var(--jbg)',
       overflow: 'hidden', marginTop: compact ? 0 : 12,
     }}>
       {/* Total del pedido — arriba del todo, porque la lista ya no muestra
           la columna Total: este panel es donde se consulta el valor. */}
       {totalPedido > 0 && (
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, padding: '10px 14px 0' }}>
-          <span style={{ fontSize: 10, color: '#6a7d5a', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '.06em' }}>
+          <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '.06em' }}>
             Total del pedido
           </span>
           <span style={{ fontSize: 17, fontWeight: 800, color: 'var(--ink)', fontFamily: "'DM Mono', monospace" }}>
@@ -206,20 +206,20 @@ export default function PanelPagos({ pedido, onUpdated, onCambioLocal, showToast
             {estadoPago === 'Pagado' ? '✅ Pagado' : estadoPago === 'Parcial' ? `💰 Parcial — abonado ${fmtCOP(totalAbonado)}` : '💳 Sin pago'}
           </span>
           {saldoPendiente > 0 && (
-            <span style={{ fontSize: 12, color: '#8a5a16', fontFamily: "'DM Mono', monospace" }}>
+            <span style={{ fontSize: 12, color: 'var(--jtx)', fontFamily: "'DM Mono', monospace" }}>
               Saldo: <strong>{fmtCOP(saldoPendiente)}</strong>
             </span>
           )}
         </div>
         {totalPedido > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-            <div style={{ width: 80, height: 6, background: '#e0e0e0', borderRadius: 20, overflow: 'hidden' }}>
+            <div style={{ width: 80, height: 6, background: 'var(--border)', borderRadius: 20, overflow: 'hidden' }}>
               <div style={{ width: `${pct}%`, height: '100%', background: colorEstado, borderRadius: 20, transition: 'width .3s' }} />
             </div>
             <span style={{ fontSize: 11, fontFamily: "'DM Mono', monospace", color: colorEstado, fontWeight: 700 }}>{pct}%</span>
           </div>
         )}
-        {compact && <span style={{ fontSize: 14, color: '#aaa' }}>{expandido ? '▲' : '▼'}</span>}
+        {compact && <span style={{ fontSize: 14, color: 'var(--muted)' }}>{expandido ? '▲' : '▼'}</span>}
       </div>
 
       {expandido && (
@@ -228,22 +228,22 @@ export default function PanelPagos({ pedido, onUpdated, onCambioLocal, showToast
           {/* Historial con edición */}
           {abonos.length > 0 && (
             <div style={{ marginTop: 12, marginBottom: 12 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#6a7d5a', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>
                 Historial de pagos
               </div>
               {abonos.map(a => (
                 <div key={a.id}>
                   {editId === a.id ? (
                     /* Fila en modo edición */
-                    <div style={{ background: '#fff', border: '1px solid #dde3d2', borderRadius: 8, padding: 10, marginBottom: 6 }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: '#1a3c63', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', marginBottom: 8 }}>
+                    <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 8, padding: 10, marginBottom: 6 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--ink)', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', marginBottom: 8 }}>
                         ✏️ Editando abono
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
                         <div>
                           <label style={lbl}>Monto (sin puntos)</label>
                           <input type="number" step="1" min="0" value={editMonto} onChange={e => setEditMonto(e.target.value)} style={{ ...inp, fontFamily: "'DM Mono', monospace" }} />
-                          {editMonto > 0 && <span style={{ fontSize: 11, color: '#4b8523', fontFamily: "'DM Mono', monospace" }}>= {fmtCOP(editMonto)}</span>}
+                          {editMonto > 0 && <span style={{ fontSize: 11, color: 'var(--thread)', fontFamily: "'DM Mono', monospace" }}>= {fmtCOP(editMonto)}</span>}
                         </div>
                         <div>
                           <label style={lbl}>Fecha</label>
@@ -258,22 +258,22 @@ export default function PanelPagos({ pedido, onUpdated, onCambioLocal, showToast
                         <button onClick={() => guardarEdicion(a)} style={{ padding: '6px 12px', background: '#4b8523', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                           Guardar cambio
                         </button>
-                        <button onClick={cancelarEdicion} style={{ padding: '6px 12px', background: '#f5f2e7', color: '#6a7d5a', border: '1px solid #dde3d2', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>
+                        <button onClick={cancelarEdicion} style={{ padding: '6px 12px', background: 'var(--loom)', color: 'var(--muted)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>
                           Cancelar
                         </button>
                       </div>
                     </div>
                   ) : (
                     /* Fila normal con botones editar y eliminar */
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px dotted #e0e0e0', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px dotted var(--border)', gap: 8 }}>
                       <div style={{ flex: 1 }}>
-                        <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, color: '#4b8523', fontSize: 13 }}>{fmtCOP(a.monto)}</span>
-                        {a.nota && <span style={{ fontSize: 11, color: '#6a7d5a', marginLeft: 8 }}>{a.nota}</span>}
+                        <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, color: 'var(--thread)', fontSize: 13 }}>{fmtCOP(a.monto)}</span>
+                        {a.nota && <span style={{ fontSize: 11, color: 'var(--muted)', marginLeft: 8 }}>{a.nota}</span>}
                       </div>
-                      <span style={{ fontSize: 11, color: '#aaa', fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{fmtFecha(a.fecha)}</span>
+                      <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: "'DM Mono', monospace", flexShrink: 0 }}>{fmtFecha(a.fecha)}</span>
                       <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                        <button onClick={() => abrirEdicion(a)} title="Editar abono" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#1a3c63', padding: '0 3px' }}>✏️</button>
-                        <button onClick={() => eliminarAbono(a.id, a.monto)} title="Eliminar abono" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#ccc', padding: '0 3px' }}>✕</button>
+                        <button onClick={() => abrirEdicion(a)} title="Editar abono" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--ink)', padding: '0 3px' }}>✏️</button>
+                        <button onClick={() => eliminarAbono(a.id, a.monto)} title="Eliminar abono" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--muted)', padding: '0 3px' }}>✕</button>
                       </div>
                     </div>
                   )}
@@ -281,22 +281,22 @@ export default function PanelPagos({ pedido, onUpdated, onCambioLocal, showToast
               ))}
               <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 7, fontWeight: 700, fontSize: 13 }}>
                 <span>Total abonado</span>
-                <span style={{ color: '#4b8523', fontFamily: "'DM Mono', monospace" }}>{fmtCOP(totalAbonado)}</span>
+                <span style={{ color: 'var(--thread)', fontFamily: "'DM Mono', monospace" }}>{fmtCOP(totalAbonado)}</span>
               </div>
             </div>
           )}
 
           {/* Nuevo abono */}
           {estadoPago !== 'Pagado' && !editId && (
-            <div style={{ background: '#fffdf8', border: '1px solid #e0e0e0', borderRadius: 8, padding: 12, marginTop: 8 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#6a7d5a', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>
+            <div style={{ background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 8, padding: 12, marginTop: 8 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>
                 Registrar abono
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
                 <div>
                   <label style={lbl}>Monto (sin puntos)</label>
                   <input type="number" step="1" min="0" value={monto} onChange={e => setMonto(e.target.value)} placeholder="Ej: 50000" style={{ ...inp, fontFamily: "'DM Mono', monospace" }} />
-                  {monto > 0 && <span style={{ fontSize: 11, color: '#4b8523', fontFamily: "'DM Mono', monospace" }}>= {fmtCOP(monto)}</span>}
+                  {monto > 0 && <span style={{ fontSize: 11, color: 'var(--thread)', fontFamily: "'DM Mono', monospace" }}>= {fmtCOP(monto)}</span>}
                 </div>
                 <div>
                   <label style={lbl}>Fecha</label>
@@ -312,7 +312,7 @@ export default function PanelPagos({ pedido, onUpdated, onCambioLocal, showToast
                   {guardando ? 'Guardando…' : '＋ Registrar abono'}
                 </button>
                 {totalPedido > 0 && saldoPendiente > 0 && (
-                  <button onClick={marcarPagado} disabled={guardando} style={{ padding: '7px 14px', background: '#fff', color: '#4b8523', border: '1.5px solid #4b8523', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                  <button onClick={marcarPagado} disabled={guardando} style={{ padding: '7px 14px', background: 'var(--white)', color: 'var(--thread)', border: '1.5px solid var(--thread)', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                     ✅ Marcar como pagado ({fmtCOP(saldoPendiente)})
                   </button>
                 )}
@@ -321,7 +321,7 @@ export default function PanelPagos({ pedido, onUpdated, onCambioLocal, showToast
           )}
 
           {estadoPago === 'Pagado' && (
-            <div style={{ textAlign: 'center', padding: '10px 0', fontSize: 13, color: '#4b8523', fontWeight: 600 }}>
+            <div style={{ textAlign: 'center', padding: '10px 0', fontSize: 13, color: 'var(--thread)', fontWeight: 600 }}>
               ✅ Pedido pagado completamente
             </div>
           )}
