@@ -40,6 +40,14 @@ function ddmm(fechaTexto) {
   const d = new Date(fechaTexto.length <= 10 ? fechaTexto + 'T00:00:00' : fechaTexto)
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
 }
+// Días que tardó un pedido entre su fecha y la entrega (si tiene las dos).
+function diasEnTaller(p) {
+  if (p.estado !== 'Entregado' || !p.fecha_entregado || !p.fecha) return null
+  const a = new Date(String(p.fecha).slice(0, 10) + 'T00:00:00')
+  const b = new Date(String(p.fecha_entregado).slice(0, 10) + 'T00:00:00')
+  const d = Math.round((b - a) / 86400000)
+  return d >= 0 ? d : null
+}
 const textoMillones = (v) => { const m = v / 1e6; return (Number.isInteger(m) || m >= 10 ? Math.round(m) : m.toFixed(1)) + 'M' }
 
 export default function Resumen({ pedidos, showToast, onAbrirPedido, actualizarPedidoLocal }) {
@@ -68,6 +76,9 @@ export default function Resumen({ pedidos, showToast, onAbrirPedido, actualizarP
   const prodAnt = producido(sel - 1)
   const variacion = prodAnt > 0 ? Math.round(((prodSel - prodAnt) / prodAnt) * 100) : null
   const entregadosSel = pedSel.filter((p) => p.estado === 'Entregado').length
+  // Tiempo medio en el taller de los pedidos del mes que ya se entregaron.
+  const diasSel = pedSel.map(diasEnTaller).filter((d) => d != null)
+  const promedioDias = diasSel.length ? Math.round(diasSel.reduce((a, b) => a + b, 0) / diasSel.length) : null
   const nPend = pedidos.filter((p) => p.estado === 'Pendiente').length
   const nProc = pedidos.filter((p) => p.estado === 'En proceso').length
   const nListo = pedidos.filter((p) => p.estado === 'Listo').length
@@ -197,6 +208,7 @@ export default function Resumen({ pedidos, showToast, onAbrirPedido, actualizarP
           <div className="lbl">Pedidos de {mm}</div>
           <div className="val">{pedSel.length}</div>
           <div className="pie">{entregadosSel} entregado{entregadosSel === 1 ? '' : 's'} · {pedSel.length - entregadosSel} en el taller</div>
+          {promedioDias != null && <div className="pie">Tardan {promedioDias} día{promedioDias === 1 ? '' : 's'} en promedio en salir</div>}
         </div>
         <div className="rs-kpi">
           <div className="lbl">En el taller hoy</div>
