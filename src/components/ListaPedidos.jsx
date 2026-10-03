@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient'
 import { TIPO_LABEL, TIPO_ICON, fmtCOP, calcProgreso, totalesPorTipoCam, ESTADOS, ESTADO_ICON, ESTADO_DOT, PAGO_COLOR, PAGO_ICON } from './constants'
 import { imprimirEtiqueta } from './factura'
 import PanelPagos from './PanelPagos'
+import { InsigniaTipos } from './Insignias'
 
 // ============================================
 // RESUMEN DE UNIDADES POR PEDIDO
@@ -159,8 +160,8 @@ export default function ListaPedidos({ pedidos, loading, onVerDetalle, onElimina
             ) : (
               filtrados.map((p, rowIdx) => {
                 const idx = pedidos.indexOf(p)
-                const tipsCam = [...new Set((p.items_camiseta || []).flatMap((it) => it.tipos || []))].map((t) => TIPO_ICON[t] + TIPO_LABEL[t])
-                const tipsChaq = [...new Set((p.items_chaqueta || []).flatMap((it) => it.tipos || []))].map((t) => TIPO_ICON[t] + TIPO_LABEL[t])
+                const tipsCam = [...new Set((p.items_camiseta || []).flatMap((it) => it.tipos || []))]
+                const tipsChaq = [...new Set((p.items_chaqueta || []).flatMap((it) => it.tipos || []))]
                 const ni = (p.items_camiseta || []).length + (p.items_chaqueta || []).length
                 const unidCam = unidadesCamiseta(p.items_camiseta)
                 const unidChaq = unidadesChaqueta(p.items_chaqueta)
@@ -202,13 +203,13 @@ export default function ListaPedidos({ pedidos, loading, onVerDetalle, onElimina
                       <td onClick={() => onVerDetalle(idx)} style={{ cursor: 'pointer', minWidth: 150 }}>
                         {tipsCam.length > 0 && (
                           <div style={{ marginBottom: tipsChaq.length > 0 ? 5 : 0 }}>
-                            <span className="badge cam">👔 {tipsCam.join(' · ')}</span>
+                            <InsigniaTipos tipos={tipsCam} prenda="cam" />
                             {unidCam && <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--thread)', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>{unidCam}</div>}
                           </div>
                         )}
                         {tipsChaq.length > 0 && (
                           <div>
-                            <span className="badge chaq">🧥 {tipsChaq.join(' · ')}</span>
+                            <InsigniaTipos tipos={tipsChaq} prenda="chaq" />
                             {unidChaq && <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--yarn)', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>{unidChaq}</div>}
                           </div>
                         )}
@@ -229,7 +230,7 @@ export default function ListaPedidos({ pedidos, loading, onVerDetalle, onElimina
                         <button
                           onClick={() => setAbiertoPago(pagoAberto ? null : p.id)}
                           style={{
-                            padding: '4px 10px', borderRadius: 20, border: `1.5px solid ${colorPago}`,
+                            padding: '4px 10px', borderRadius: 6, border: `1.5px solid ${colorPago}`,
                             background: `${colorPago}12`, color: colorPago,
                             fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: "'DM Mono', monospace",
                             whiteSpace: 'nowrap',
