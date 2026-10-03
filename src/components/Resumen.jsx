@@ -161,7 +161,7 @@ export default function Resumen({ pedidos, showToast, onAbrirPedido, actualizarP
   const mm = nombreMes(sel).toLowerCase()
 
   return (
-    <div className="rs">
+    <div className="rsm">
       <div className="lp-cab">
         <div>
           <h1>Resumen</h1>
