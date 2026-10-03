@@ -1,9 +1,34 @@
-import { useState } from 'react'
+import { useState, Fragment } from 'react'
 import { supabase } from '../supabaseClient'
 import { TIPO_LABEL, TIPO_ICON, fmtCOP, calcProgreso, totalesPorTipoCam, ESTADOS, ESTADO_ICON, ESTADO_DOT, PAGO_COLOR, PAGO_ICON } from './constants'
 import { imprimirEtiqueta } from './factura'
 import PanelPagos from './PanelPagos'
 import { InsigniaTipos } from './Insignias'
+
+// Iconos simples para los botones de cada fila (heredan el color del botón).
+const Ico = {
+  etiqueta: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 12 12 20 3 11V3h8z" /><circle cx="7.5" cy="7.5" r="1.5" /></svg>,
+  enlace: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1" /><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1" /></svg>,
+  borrar: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" /></svg>,
+  buscar: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>,
+}
+
+// Color de cada etapa del taller (punto y texto del selector de estado).
+const ETAPA_COLOR = { 'Pendiente': 'var(--jtx)', 'En proceso': 'var(--ink)', 'Listo': 'var(--thread)', 'Entregado': 'var(--muted)' }
+
+// Días desde que se creó el pedido. Sirve para ver de un vistazo qué lleva
+// mucho tiempo en el taller (más de 10 días se pinta en rojo).
+function diasDesde(p) {
+  const base = p.creado_en || p.fecha
+  if (!base) return null
+  const d = Math.floor((Date.now() - new Date(base).getTime()) / 86400000)
+  return d < 0 ? 0 : d
+}
+function textoDias(d) {
+  if (d == null) return ''
+  if (d === 0) return 'hoy'
+  return `hace ${d} día${d === 1 ? '' : 's'}`
+}
 
 // ============================================
 // RESUMEN DE UNIDADES POR PEDIDO
@@ -56,13 +81,16 @@ function unidadesChaqueta(items) {
 export default function ListaPedidos({ pedidos, loading, onVerDetalle, onEliminar, onCompartir, showToast, refrescar, actualizarPedidoLocal, titulo = 'Pedidos', soloEntregados = false }) {
   const [busqueda, setBusqueda] = useState('')
   const [filEstado, setFilEstado] = useState('')
+  const [modo, setModo] = useState('lista') // 'lista' | 'tablero' (solo en Activos)
   const [abiertoPago, setAbiertoPago] = useState(null) // id del pedido con panel pago abierto
 
-  const filtrados = pedidos.filter((p) => {
-    const match = (p.cliente + ' ' + p.numero).toLowerCase().includes(busqueda.toLowerCase())
-    const me = !filEstado || p.estado === filEstado
-    return match && me
-  })
+  const coincide = (p) => (p.cliente + ' ' + p.numero).toLowerCase().includes(busqueda.toLowerCase())
+  // En Activos se muestra primero lo más viejo (lo que lleva más tiempo en el
+  // taller). En Entregados se deja el orden de siempre (lo más reciente arriba).
+  const ordenados = soloEntregados ? pedidos : [...pedidos].sort((a, b) => String(a.creado_en || a.fecha).localeCompare(String(b.creado_en || b.fecha)))
+  const filtrados = ordenados.filter((p) => coincide(p) && (!filEstado || p.estado === filEstado))
+  const etapas = ESTADOS.filter((e) => e !== 'Entregado')
+  const cuenta = (e) => pedidos.filter((p) => p.estado === e).length
 
   // Pinta el nuevo estado de una vez (el desplegable ya lo cambió solo en
   // pantalla, pero el resto de la fila —badge, filtros— depende de esto) y
@@ -118,157 +146,186 @@ export default function ListaPedidos({ pedidos, loading, onVerDetalle, onElimina
     showToast('⬇️', 'CSV exportado')
   }
 
+  // Datos calculados de un pedido que usan la tabla y el tablero.
+  function datos(p) {
+    const tipsCam = [...new Set((p.items_camiseta || []).flatMap((it) => it.tipos || []))]
+    const tipsChaq = [...new Set((p.items_chaqueta || []).flatMap((it) => it.tipos || []))]
+    const itemsChaq = p.items_chaqueta || []
+    const totalReal = (p.total_camiseta || 0) + itemsChaq.reduce((s, it) => s + (it.total_final || 0), 0)
+    const abonado = p.total_abonado || 0
+    return {
+      tipsCam, tipsChaq,
+      ni: (p.items_camiseta || []).length + itemsChaq.length,
+      unidCam: unidadesCamiseta(p.items_camiseta),
+      unidChaq: unidadesChaqueta(p.items_chaqueta),
+      totalReal,
+      algunChaqPendiente: itemsChaq.some((it) => it.kilos_reales == null),
+      pctPago: totalReal > 0 ? Math.min(100, Math.round((abonado / totalReal) * 100)) : 0,
+      pr: calcProgreso(p),
+      estadoPago: p.estado_pago || 'Pendiente',
+      dias: diasDesde(p),
+    }
+  }
+
+  const Productos = ({ d }) => (
+    <>
+      {d.tipsCam.length > 0 && (
+        <div className="lp-prod">
+          <InsigniaTipos tipos={d.tipsCam} prenda="cam" />
+          {d.unidCam && <div className="lp-unid">{d.unidCam}</div>}
+        </div>
+      )}
+      {d.tipsChaq.length > 0 && (
+        <div className="lp-prod">
+          <InsigniaTipos tipos={d.tipsChaq} prenda="chaq" />
+          {d.unidChaq && <div className="lp-unid">{d.unidChaq}</div>}
+        </div>
+      )}
+      {!d.tipsCam.length && !d.tipsChaq.length && '—'}
+      {d.ni > 1 && <div className="lp-unid">{d.ni} ítems</div>}
+    </>
+  )
+
+  const Avance = ({ d }) => d.pr.total > 0 ? (
+    <div className="lp-avance">
+      <div className="prog-wrap"><div className="prog-bar" style={{ width: `${d.pr.pct}%` }} /></div>
+      <span>{d.pr.ok} de {d.pr.total} empacadas{d.pr.falta > 0 && <b className="lp-falta"> · faltan {d.pr.falta}</b>}</span>
+    </div>
+  ) : <span className="lp-unid">—</span>
+
+  const Pago = ({ p, d }) => {
+    const color = PAGO_COLOR[d.estadoPago]
+    const texto = d.estadoPago === 'Pagado' ? 'pagado' : d.estadoPago === 'Parcial' ? `abonó ${d.pctPago}%` : 'sin pago'
+    const clase = d.estadoPago === 'Pagado' ? 'ok' : d.estadoPago === 'Parcial' ? 'parcial' : 'debe'
+    return (
+      <button className={`lp-pago ${clase}`} onClick={(e) => { e.stopPropagation(); setAbiertoPago(abiertoPago === p.id ? null : p.id) }} title="Ver y registrar pagos" style={{ '--c': color }}>
+        {texto}
+        {d.algunChaqPendiente && <span title="Falta pesar la chaqueta: el total aún no es el definitivo"> ⚖️</span>}
+      </button>
+    )
+  }
+
+  const Acciones = ({ p }) => (
+    <div className="lp-acc" onClick={(e) => e.stopPropagation()}>
+      <button className="lp-ico" title="Imprimir etiqueta" aria-label="Imprimir etiqueta" onClick={() => imprimirEtiqueta(p)}>{Ico.etiqueta}</button>
+      <button className="lp-ico" title="Compartir con el cliente" aria-label="Compartir con el cliente" onClick={() => onCompartir(p)}>{Ico.enlace}</button>
+      <button className="lp-ico peligro" title="Eliminar pedido" aria-label="Eliminar pedido" onClick={() => onEliminar(p)}>{Ico.borrar}</button>
+    </div>
+  )
+
+  const vacio = (
+    <div className="empty"><div className="empty-ico">🧵</div>
+      <p>{busqueda || filEstado ? 'Ningún pedido coincide con la búsqueda' : soloEntregados ? 'Aún no hay pedidos entregados' : 'No hay pedidos en el taller'}</p>
+    </div>
+  )
+
   return (
-    <div>
-      {titulo && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-          <div style={{ width: 3, height: 18, background: 'var(--thread)', borderRadius: 2 }} />
-          <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', fontFamily: "'Playfair Display', serif" }}>{titulo}</h2>
-          <span style={{ fontSize: 12, color: 'var(--muted)', fontFamily: "'DM Mono', monospace" }}>({filtrados.length})</span>
+    <div className="lp">
+      <div className="lp-cab">
+        <div>
+          <h1>{soloEntregados ? 'Entregados' : 'Activos'}</h1>
+          <p>{soloEntregados ? 'El historial de lo que ya salió del taller.' : 'Lo que está en el taller, de lo más viejo a lo más nuevo.'}</p>
+        </div>
+        {!soloEntregados && (
+          <div className="lp-seg" role="group" aria-label="Forma de ver">
+            <button className={modo === 'lista' ? 'on' : ''} onClick={() => setModo('lista')}>Lista</button>
+            <button className={modo === 'tablero' ? 'on' : ''} onClick={() => setModo('tablero')}>Tablero</button>
+          </div>
+        )}
+      </div>
+
+      {!soloEntregados && modo === 'lista' && (
+        <div className="lp-etapas">
+          <button className={`lp-etapa ${!filEstado ? 'on' : ''}`} onClick={() => setFilEstado('')}>
+            <span className="n">{pedidos.length}</span><span className="l">Todos</span>
+          </button>
+          {etapas.map((e) => (
+            <button key={e} className={`lp-etapa ${filEstado === e ? 'on' : ''}`} onClick={() => setFilEstado(filEstado === e ? '' : e)}>
+              <span className="n">{cuenta(e)}</span>
+              <span className="l"><i className="lp-punto" style={{ background: ETAPA_COLOR[e] }} />{e === 'Listo' ? 'Listo para entregar' : e}</span>
+            </button>
+          ))}
         </div>
       )}
 
-      <div className="filters">
-        <div className="sw">
-          <span className="sico">🔍</span>
-          <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar cliente o N° pedido..." />
-        </div>
-        {!soloEntregados && (
-          <select className="fsel" value={filEstado} onChange={(e) => setFilEstado(e.target.value)}>
-            <option value="">Todos los estados</option>
-            {ESTADOS.filter(e => e !== 'Entregado').map((es) => <option key={es} value={es}>{ESTADO_ICON[es]} {es}</option>)}
-          </select>
-        )}
-        <button className="btn btn-s btn-sm" onClick={exportCSV}>⬇ CSV</button>
+      <div className="lp-filtros">
+        <label className="lp-buscar">
+          {Ico.buscar}
+          <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar cliente o número de pedido" />
+        </label>
+        <button className="lp-btn" onClick={exportCSV}>Exportar CSV</button>
       </div>
 
-      <div className="twrap">
-        <table>
-          <thead>
-            <tr>
-              <th>N°</th><th>Cliente</th><th>Observaciones</th><th>Ítems</th>
-              <th>Progreso</th><th>Pago</th><th>Estado</th><th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={8}><div className="empty"><div className="empty-ico">⏳</div><p>Cargando…</p></div></td></tr>
-            ) : !filtrados.length ? (
-              <tr><td colSpan={8}><div className="empty"><div className="empty-ico">🧵</div>
-                <p>{busqueda || filEstado ? 'Sin resultados' : soloEntregados ? 'Aún no hay pedidos entregados' : 'Sin pedidos activos'}</p>
-              </div></td></tr>
-            ) : (
-              filtrados.map((p, rowIdx) => {
+      {loading ? (
+        <div className="twrap"><div className="empty"><div className="empty-ico">⏳</div><p>Cargando…</p></div></div>
+      ) : !soloEntregados && modo === 'tablero' ? (
+        <div className="lp-tablero">
+          {etapas.map((e) => {
+            const cols = ordenados.filter((p) => p.estado === e && coincide(p))
+            return (
+              <div key={e} className="lp-col">
+                <h3><i className="lp-punto" style={{ background: ETAPA_COLOR[e] }} />{e}<span>{cols.length}</span></h3>
+                {cols.length ? cols.map((p) => {
+                  const d = datos(p)
+                  return (
+                    <div key={p.id} className="lp-tarj" onClick={() => onVerDetalle(pedidos.indexOf(p))}>
+                      <div className="fila"><span className="td-nlbl">{p.numero}</span><span className={`lp-dias ${d.dias > 10 ? 'tarde' : ''}`}>{textoDias(d.dias)}</span></div>
+                      <div className="lp-cli"><b>{p.cliente}</b>{p.observaciones && <span>{p.observaciones}</span>}</div>
+                      <Productos d={d} />
+                      <Avance d={d} />
+                      <div className="fila"><Pago p={p} d={d} /><Acciones p={p} /></div>
+                      {abiertoPago === p.id && (
+                        <div onClick={(ev) => ev.stopPropagation()}>
+                          <PanelPagos pedido={p} onUpdated={refrescar} onCambioLocal={(cambios) => actualizarPedidoLocal?.(p.id, cambios)} showToast={showToast} compact={false} />
+                        </div>
+                      )}
+                    </div>
+                  )
+                }) : <div className="lp-vacia">Nada aquí</div>}
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <div className="twrap lp-tabla">
+          <table>
+            <thead>
+              <tr><th>N°</th><th>Cliente</th><th>Productos</th><th>Avance</th><th>Pago</th><th>Estado</th><th></th></tr>
+            </thead>
+            <tbody>
+              {!filtrados.length ? (
+                <tr><td colSpan={7}>{vacio}</td></tr>
+              ) : filtrados.map((p) => {
                 const idx = pedidos.indexOf(p)
-                const tipsCam = [...new Set((p.items_camiseta || []).flatMap((it) => it.tipos || []))]
-                const tipsChaq = [...new Set((p.items_chaqueta || []).flatMap((it) => it.tipos || []))]
-                const ni = (p.items_camiseta || []).length + (p.items_chaqueta || []).length
-                const unidCam = unidadesCamiseta(p.items_camiseta)
-                const unidChaq = unidadesChaqueta(p.items_chaqueta)
-                // Calcular total real: camiseta + chaqueta pesada
-                const totCam = p.total_camiseta || 0
-                const itemsChaq = p.items_chaqueta || []
-                const algunChaqPendiente = itemsChaq.some(it => it.kilos_reales == null)
-                const totChaqPesada = itemsChaq.reduce((s, it) => s + (it.total_final || 0), 0)
-                const totalReal = totCam + totChaqPesada
-
-                // % pagado, con el total abonado que adjunta Pedidos.jsx.
-                // Si el pedido tiene chaqueta sin pesar, el total todavía no
-                // es el definitivo — por eso se avisa con ⚖️ junto a la barra.
-                const abonado = p.total_abonado || 0
-                const pctPago = totalReal > 0 ? Math.min(100, Math.round((abonado / totalReal) * 100)) : 0
-                const pr = calcProgreso(p)
-                const estadoPago = p.estado_pago || 'Pendiente'
-                const colorPago = PAGO_COLOR[estadoPago]
-                const pagoAberto = abiertoPago === p.id
-
+                const d = datos(p)
+                const pagoAbierto = abiertoPago === p.id
                 return (
-                  <>
-                    <tr key={p.id} style={{ borderBottom: pagoAberto ? 'none' : undefined }}>
-                      <td onClick={() => onVerDetalle(idx)} style={{ cursor: 'pointer' }}><span className="td-nlbl">{p.numero}</span></td>
-                      <td onClick={() => onVerDetalle(idx)} style={{ fontWeight: 600, cursor: 'pointer' }}>{p.cliente}</td>
-                      <td
-                        onClick={() => onVerDetalle(idx)}
-                        title={p.observaciones || ''}
-                        style={{
-                          cursor: 'pointer', fontSize: 12, color: 'var(--muted)',
-                          // Tope de ancho: si la nota es larga se corta con "…"
-                          // (el texto completo queda en el tooltip) para que no
-                          // se estire la columna y descuadre el resto de la tabla.
-                          maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {p.observaciones || <span style={{ color: 'var(--border)' }}>—</span>}
-                      </td>
-                      <td onClick={() => onVerDetalle(idx)} style={{ cursor: 'pointer', minWidth: 150 }}>
-                        {tipsCam.length > 0 && (
-                          <div style={{ marginBottom: tipsChaq.length > 0 ? 5 : 0 }}>
-                            <InsigniaTipos tipos={tipsCam} prenda="cam" />
-                            {unidCam && <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--thread)', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>{unidCam}</div>}
-                          </div>
-                        )}
-                        {tipsChaq.length > 0 && (
-                          <div>
-                            <InsigniaTipos tipos={tipsChaq} prenda="chaq" />
-                            {unidChaq && <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--yarn)', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>{unidChaq}</div>}
-                          </div>
-                        )}
-                        {!tipsCam.length && !tipsChaq.length && '—'}
-                        {ni > 1 && <span style={{ fontSize: 10, color: 'var(--muted)' }}>({ni} ítems)</span>}
-                      </td>
-                      <td onClick={() => onVerDetalle(idx)} style={{ minWidth: 120, cursor: 'pointer' }}>
-                        {pr.total > 0 ? (
-                          <>
-                            <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 3, fontFamily: "'DM Mono', monospace" }}>
-                              ✅ {pr.ok}/{pr.total} {pr.falta > 0 && `· ❓ ${pr.falta}`}
-                            </div>
-                            <div className="prog-wrap"><div className="prog-bar" style={{ width: `${pr.pct}%` }} /></div>
-                          </>
-                        ) : <span style={{ fontSize: 11, color: 'var(--muted)' }}>—</span>}
-                      </td>
-                      <td onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => setAbiertoPago(pagoAberto ? null : p.id)}
-                          style={{
-                            padding: '4px 10px', borderRadius: 6, border: `1.5px solid ${colorPago}`,
-                            background: `${colorPago}12`, color: colorPago,
-                            fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: "'DM Mono', monospace",
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {PAGO_ICON[estadoPago]} {estadoPago}
-                        </button>
-                        {totalReal > 0 && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 }}>
-                            <div style={{ width: 54, height: 5, background: '#e0e0e0', borderRadius: 20, overflow: 'hidden', flexShrink: 0 }}>
-                              <div style={{ width: `${pctPago}%`, height: '100%', background: colorPago, borderRadius: 20, transition: 'width .3s' }} />
-                            </div>
-                            <span style={{ fontSize: 10, fontFamily: "'DM Mono', monospace", color: colorPago, fontWeight: 700 }}>{pctPago}%</span>
-                            {algunChaqPendiente && <span style={{ fontSize: 10, color: 'var(--warn)' }} title="Falta pesar la chaqueta: el total aún no es el definitivo">⚖️</span>}
-                          </div>
-                        )}
-                      </td>
-                      <td onClick={(e) => e.stopPropagation()}>
-                        <select
-                          className="estado-select"
-                          value={p.estado}
-                          onChange={(e) => cambiarEstado(p, e.target.value)}
-                          style={{ borderColor: 'transparent' }}
-                        >
-                          {ESTADOS.map((es) => <option key={es} value={es}>{ESTADO_ICON[es]} {es}</option>)}
-                        </select>
-                      </td>
-                      <td onClick={(e) => e.stopPropagation()}>
-                        <div style={{ display: 'flex', gap: 5 }}>
-                          <button className="btn btn-s btn-sm" title="Imprimir etiqueta" onClick={() => imprimirEtiqueta(p)}>🏷️</button>
-                          <button className="btn btn-s btn-sm" title="Compartir" onClick={() => onCompartir(p)}>🔗</button>
-                          <button className="btn btn-d btn-sm" onClick={() => onEliminar(p)}>🗑</button>
+                  <Fragment key={p.id}>
+                    <tr className={pagoAbierto ? 'abierto' : ''} onClick={() => onVerDetalle(idx)}>
+                      <td className="c-num"><span className="td-nlbl">{p.numero}</span></td>
+                      <td className="c-cli">
+                        <div className="lp-cli">
+                          <b>{p.cliente}</b>
+                          <span title={p.observaciones || ''}>
+                            {p.observaciones ? <span className="lp-obs">{p.observaciones}</span> : null}
+                            {p.observaciones && !soloEntregados && ' · '}
+                            {!soloEntregados && <span className={`lp-dias ${d.dias > 10 ? 'tarde' : ''}`}>{textoDias(d.dias)}</span>}
+                          </span>
                         </div>
                       </td>
+                      <td className="c-prod"><Productos d={d} /></td>
+                      <td className="c-av"><Avance d={d} /></td>
+                      <td className="c-pago"><Pago p={p} d={d} /></td>
+                      <td className="c-est" onClick={(e) => e.stopPropagation()}>
+                        <select className="estado-select" value={p.estado} onChange={(e) => cambiarEstado(p, e.target.value)} style={{ color: ETAPA_COLOR[p.estado] }} aria-label={`Estado de ${p.numero}`}>
+                          {ESTADOS.map((es) => <option key={es} value={es}>{es}</option>)}
+                        </select>
+                      </td>
+                      <td className="c-acc"><Acciones p={p} /></td>
                     </tr>
-                    {pagoAberto && (
-                      <tr key={p.id + '-pago'}>
-                        <td colSpan={8} style={{ padding: '0 14px 12px', background: 'var(--loom)' }}>
+                    {pagoAbierto && (
+                      <tr className="lp-pagofila">
+                        <td colSpan={7} onClick={(e) => e.stopPropagation()}>
                           <PanelPagos
                             pedido={p}
                             onUpdated={refrescar}
@@ -279,13 +336,13 @@ export default function ListaPedidos({ pedidos, loading, onVerDetalle, onElimina
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 )
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
