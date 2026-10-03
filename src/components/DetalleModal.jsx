@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient'
 import { TIPO_LABEL, TIPO_ICON, fmtFecha, fmtCOP, calcProgreso, etapaCelda, faltanCelda, ESTADOS, ESTADO_ICON, TALLAS, TALLA_SIN_DIVIDIR, totalesPorTipoCam } from './constants'
 import { generarFacturaPDF, generarFacturaMini, imprimirEtiqueta } from './factura'
 import PanelPagos from './PanelPagos'
+import { InsigniaTipos, InsigniaJuego } from './Insignias'
 import ColorSwatch from './ColorSwatch'
 import FormulaColorBoton from './FormulaColorBoton'
 
@@ -274,7 +275,6 @@ function ItemCamView({ it, estados, itemIndice, onEtapa, onFaltan, onImgClick, s
   // identificadores nuevos, así que amarrarla al id hacía que la selección se
   // perdiera al corregir cantidades. La posición sí sobrevive a esa recreación.
   const refItem = String(itemIndice)
-  const tLabel = it.tipos.map((t) => `${TIPO_ICON[t]} ${TIPO_LABEL[t]}`).join(' + ')
   // Orden explícito guardado; si el ítem es viejo y no lo tiene, lo derivamos
   // como respaldo (Postgres no garantiza el orden de un objeto jsonb).
   const coloresPresentes = (it.colores && it.colores.length) ? it.colores : (() => {
@@ -291,8 +291,8 @@ function ItemCamView({ it, estados, itemIndice, onEtapa, onFaltan, onImgClick, s
     <div style={{ background: 'var(--loom)', border: '1px solid var(--cbd)', borderRadius: 9, padding: 12, marginBottom: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span className="badge cam">{tLabel}</span>
-          {it.precios?.juego && <span className="badge cam" style={{ background: '#4b8523', color: '#fff' }}>🎽 Juego {fmtCOP(it.precios.juego)} c/u</span>}
+          <InsigniaTipos tipos={it.tipos} prenda="cam" />
+          {it.precios?.juego && <InsigniaJuego precio={fmtCOP(it.precios.juego)} />}
           {it.diseno && <span style={{ fontSize: 12, color: 'var(--muted)' }}>{it.diseno}</span>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -407,7 +407,6 @@ function ItemChaqView({ it, estados, itemIndice, estadoPedido, onEtapa, onFaltan
   const [kg, setKg] = useState(it.kilos_reales || '')
   const [modoFaltan, setModoFaltan] = useState(false)
   const refItem = String(itemIndice)
-  const tLabel = it.tipos.map((t) => `${TIPO_ICON[t]} ${TIPO_LABEL[t]}`).join(' + ')
   const p0 = it.precios[it.tipos[0]] || 0
   const coloresPresentes = ((it.colores && it.colores.length) ? it.colores : Object.keys(it.tabla || {})).filter((c) => it.tabla && it.tabla[c])
 
@@ -415,7 +414,7 @@ function ItemChaqView({ it, estados, itemIndice, estadoPedido, onEtapa, onFaltan
     <div style={{ background: 'var(--loom)', border: '1px solid var(--jbd)', borderRadius: 9, padding: 12, marginBottom: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span className="badge chaq">{tLabel}</span>
+          <InsigniaTipos tipos={it.tipos} prenda="chaq" />
           {it.diseno && <span style={{ fontSize: 12, color: 'var(--muted)' }}>{it.diseno}</span>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
