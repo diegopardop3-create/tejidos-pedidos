@@ -241,7 +241,7 @@ export default function FormulaColorBoton({ nombreColor, showToast, pedidoId, it
                           <button
                             type="button"
                             onClick={() => abrirVariante(idx, v)}
-                            style={{ flex: 1, textAlign: 'left', background: seleccion[it.clave] === v.id ? '#eaf5ea' : 'var(--weave)', border: seleccion[it.clave] === v.id ? '1.5px solid var(--thread)' : '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', cursor: 'pointer' }}
+                            style={{ flex: 1, textAlign: 'left', background: seleccion[it.clave] === v.id ? 'var(--cbg)' : 'var(--weave)', border: seleccion[it.clave] === v.id ? '1.5px solid var(--thread)' : '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', cursor: 'pointer' }}
                           >
                             {seleccion[it.clave] === v.id && <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--thread)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 3 }}>✓ Usada en este pedido</div>}
                             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--thread)', marginBottom: 2 }}>{v.color_nombre}</div>
