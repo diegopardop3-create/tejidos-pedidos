@@ -854,3 +854,6 @@ table.tt tfoot td { font-family: 'DM Mono', monospace; font-weight: 500; color: 
   .app-root .ico-prenda { filter: brightness(1.8) saturate(.85); }
   .app-root .badge .ico-prenda { filter: none; }
 }
+
+/* Detalle del pedido: una sola línea con cantidades y precio por ítem */
+.det-linea { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted); margin-top: 8px; }
