@@ -65,7 +65,7 @@ export default function ConfirmarEliminar({ pedido, session, onCancel, onConfirm
             autoFocus
           />
         </div>
-        {error && <div style={{ background: '#fdf2f2', color: 'var(--danger)', fontSize: 12, padding: '8px 10px', borderRadius: 7, border: '1px solid #f5c6cb', marginBottom: 6 }}>⚠️ {error}</div>}
+        {error && <div style={{ background: 'var(--white)', color: 'var(--danger)', fontSize: 12, padding: '8px 10px', borderRadius: 7, border: '1px solid var(--danger)', marginBottom: 6 }}>⚠️ {error}</div>}
         <div className="brow right" style={{ marginTop: 16 }}>
           <button className="btn btn-s" onClick={cancelar}>Cancelar</button>
           <button className="btn btn-d" onClick={confirmar} disabled={verificando} style={{ fontWeight: 700 }}>
