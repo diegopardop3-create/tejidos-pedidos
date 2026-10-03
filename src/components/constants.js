@@ -71,6 +71,10 @@ export const NEGOCIO = {
   nit: '80.262.959-2',
   direccion: 'Carrera 73H No. 58A-06 Sur',
   telefono: '313 282 1596',
+  ciudad: 'Bogotá D.C.',
+  // Cómo pagar: aparece en el comprobante solo si se escribe algo aquí.
+  // Ejemplo: 'Nequi 313 282 1596\nBancolombia ahorros 000-000000-00'
+  pago: '',
 }
 
 export function hoy() {
