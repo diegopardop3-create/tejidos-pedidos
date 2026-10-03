@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
-import { TALLAS, TALLA_SIN_DIVIDIR, TIPO_LABEL, TIPO_ICON, hoy, ESTADOS, ESTADO_ICON, fmtCOP, totalesPorTipoCam, ordenarTipos } from './constants'
+import { TALLA_SIN_DIVIDIR, TALLAS_NINO, TALLAS_ADULTO, etqTalla, partesTalla, ordenTalla, tallasDeTabla, TIPO_LABEL, hoy, ESTADOS, ESTADO_ICON, fmtCOP, totalesPorTipoCam, ordenarTipos } from './constants'
 import ColorSwatch from './ColorSwatch'
 import FormulaColorBoton from './FormulaColorBoton'
 import { InsigniaTipos, InsigniaJuego, IconoPrenda } from './Insignias'
@@ -93,7 +93,9 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
   const [camImgs, setCamImgs] = useState([])
   const [camEsJuego, setCamEsJuego] = useState(false)
   const [camEditIdx, setCamEditIdx] = useState(null) // idx en tempCam que se está editando, o null si es nuevo
-  const [camTallasSel, setCamTallasSel] = useState(new Set()) // tallas que aplican a este ítem
+  // Filas de tallas del ítem: cada fila es un grupo de tallas seguidas,
+  // ej. [['S'], ['M', 'L'], ['XL']] = S, M-L (unida) y XL.
+  const [camFilas, setCamFilas] = useState([])
   const [camPunoSinDividir, setCamPunoSinDividir] = useState(false) // si el puño va en una sola cantidad, sin dividir por talla
 
   const [chaqRows, setChaqRows] = useState([{ principal: '', rayas: [] }])
@@ -179,16 +181,8 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
   }, [])
 
   function resetItemForms() {
-    setCamSelTipos(new Set()); setCamCols([{ principal: '', rayas: [] }]); setCamCants({}); setCamDiseno(''); setCamPrecios({}); setCamImgs([]); setCamEsJuego(false); setCamEditIdx(null); setCamTallasSel(new Set()); setCamPunoSinDividir(false)
+    setCamSelTipos(new Set()); setCamCols([{ principal: '', rayas: [] }]); setCamCants({}); setCamDiseno(''); setCamPrecios({}); setCamImgs([]); setCamEsJuego(false); setCamEditIdx(null); setCamFilas([]); setCamPunoSinDividir(false)
     setChaqSelTipos(new Set()); setChaqRows([{ principal: '', rayas: [] }]); setChaqCants({}); setChaqDiseno(''); setChaqPrecios({}); setChaqImgs([]); setChaqEditIdx(null)
-  }
-
-  function toggleTalla(t) {
-    setCamTallasSel((prev) => {
-      const n = new Set(prev)
-      if (n.has(t)) n.delete(t); else n.add(t)
-      return n
-    })
   }
 
   function limpiarTodo() {
@@ -224,7 +218,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
     setCamCols((cols) => cols.filter((_, i) => i !== ci))
     setCamCants((prev) => {
       const n = {}
-      TALLAS.forEach((_, ri) => {
+      Object.keys(prev).forEach((ri) => {
         n[ri] = {}
         camCols.forEach((_, ni) => {
           if (ni === ci) return
@@ -278,12 +272,12 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
   function guardarItemCam() {
     const tipos = ordenarTipos([...camSelTipos])
     if (!tipos.length) { showToast('⚠️', 'Selecciona Puño y/o Cuello'); return }
-    if (!camTallasSel.size) { showToast('⚠️', 'Selecciona al menos una talla'); return }
+    if (!camFilas.length && !camPunoSinDividir) { showToast('⚠️', 'Selecciona al menos una talla'); return }
     const cols = camCols.map((c, ci) => ({ nombre: nombreColor(c, ci), ci }))
     const tabla = {}
     let totalU = 0
-    TALLAS.forEach((talla, ri) => {
-      if (!camTallasSel.has(talla)) return
+    camFilas.map(etqTalla).forEach((talla) => {
+      const ri = talla
       const tallaObj = {}
       cols.forEach(({ nombre, ci }) => {
         const colObj = {}
@@ -353,7 +347,8 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
     const tipos = it.tipos || []
     const colores = (it.colores && it.colores.length) ? it.colores : derivarColoresCam(it.tabla)
     const cants = {}
-    TALLAS.forEach((talla, ri) => {
+    tallasDeTabla(it.tabla).forEach((talla) => {
+      const ri = talla
       const tallaObj = (it.tabla || {})[talla]
       if (!tallaObj) return
       colores.forEach((colorName, ci) => {
@@ -384,7 +379,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
     setCamImgs(it.imagenes || [])
     setCamEsJuego(!!(it.precios && it.precios.juego))
     setCamPunoSinDividir(!!filaSD)
-    setCamTallasSel(new Set(TALLAS.filter((t) => it.tabla && it.tabla[t])))
+    setCamFilas(tallasDeTabla(it.tabla).map(partesTalla))
     setCamEditIdx(idx)
     setOpenCam(true)
   }
@@ -610,12 +605,11 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
               tipos={ordenarTipos([...camSelTipos])}
               cols={camCols} cants={camCants} diseno={camDiseno} precios={camPrecios} imgs={camImgs}
               setDiseno={setCamDiseno} setPrecios={setCamPrecios}
-              setV={camSetV} addCol={camAddCol} delCol={camDelCol}
+              setV={camSetV} setCants={setCamCants} addCol={camAddCol} delCol={camDelCol}
               setCols={setCamCols}
               esJuego={camEsJuego} setEsJuego={setCamEsJuego}
-              tallasSel={camTallasSel} onToggleTalla={toggleTalla}
-              onSelectAllTallas={() => setCamTallasSel(new Set(TALLAS))}
-              onClearTallas={() => setCamTallasSel(new Set())}
+              filas={camFilas} setFilas={setCamFilas}
+              editando={camEditIdx !== null}
               punoSinDividir={camPunoSinDividir} setPunoSinDividir={setCamPunoSinDividir}
               onImgs={(e) => handleImgs(e, 'cam')}
               onDelImg={(i) => setCamImgs((p) => p.filter((_, idx) => idx !== i))}
@@ -699,7 +693,7 @@ function ItemCardCam({ it, onDelete, onEdit, showToast }) {
   // y no lo tiene, lo reconstruimos como respaldo (puede no coincidir con el
   // orden original porque Postgres no preserva el orden de un objeto jsonb).
   const colsPresentes = (it.colores && it.colores.length) ? it.colores : derivarColoresCam(it.tabla)
-  const tallasPresentes = TALLAS.filter((t) => it.tabla && it.tabla[t])
+  const tallasPresentes = tallasDeTabla(it.tabla)
   if (it.tabla && it.tabla[TALLA_SIN_DIVIDIR]) tallasPresentes.push(TALLA_SIN_DIVIDIR)
   return (
     <div className="iblk cam">
@@ -748,11 +742,11 @@ function ItemCardCam({ it, onDelete, onEdit, showToast }) {
           return (
             <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8, fontSize: 11, color: 'var(--muted)', fontFamily: "'DM Mono', monospace" }}>
               {esJuego ? (
-                <span>🎽 Total de juegos (cuellos): <strong style={{ color: 'var(--ink)' }}>{cuello}</strong>{puno > 0 && ` · +${puno} puños incluidos`}</span>
+                <span className="np-tot-ico"><IconoPrenda tipo="cuello" prenda="cam" /><IconoPrenda tipo="puno" prenda="cam" />Total de juegos (cuellos): <strong style={{ color: 'var(--ink)' }}>{cuello}</strong>{puno > 0 && ` · +${puno} puños incluidos`}</span>
               ) : (
                 <>
-                  {cuello > 0 && <span>🔵 Total cuellos: <strong style={{ color: 'var(--ink)' }}>{cuello}</strong></span>}
-                  {puno > 0 && <span>🧤 Total puños: <strong style={{ color: 'var(--ink)' }}>{puno}</strong></span>}
+                  {cuello > 0 && <span className="np-tot-ico"><IconoPrenda tipo="cuello" prenda="cam" />Total cuellos: <strong style={{ color: 'var(--ink)' }}>{cuello}</strong></span>}
+                  {puno > 0 && <span className="np-tot-ico"><IconoPrenda tipo="puno" prenda="cam" />Total puños: <strong style={{ color: 'var(--ink)' }}>{puno}</strong></span>}
                 </>
               )}
             </div>
@@ -816,279 +810,351 @@ function ItemCardChaq({ it, onDelete, onEdit, showToast }) {
   )
 }
 
-function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, setPrecios, setV, addCol, delCol, setCols, onImgs, onDelImg, onCancel, onSave, esJuego, setEsJuego, tallasSel, onToggleTalla, onSelectAllTallas, onClearTallas, showToast, punoSinDividir, setPunoSinDividir }) {
+// Formulario de un ítem de camiseta: precios, diseño, fotos y la tabla de
+// tallas × colores. Las tallas se eligen tocando botones; para unir dos o más
+// tallas seguidas (ej. M y L) se marcan en la tabla y se toca "Unir". Las
+// cantidades de las tallas unidas se suman en la nueva fila.
+function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, setPrecios, setV, setCants, addCol, delCol, setCols, onImgs, onDelImg, onCancel, onSave, esJuego, setEsJuego, filas, setFilas, editando, showToast, punoSinDividir, setPunoSinDividir }) {
   const puedeSerJuego = tipos.length === 2 && tipos.includes('puno') && tipos.includes('cuello')
+  const juego = esJuego && puedeSerJuego
+  const psd = punoSinDividir && tipos.includes('puno')
+  const [marcadas, setMarcadas] = useState(() => new Set())
+  const [curvaAbierta, setCurvaAbierta] = useState(false)
+  const [curvaTotal, setCurvaTotal] = useState('')
+  const [curvaProp, setCurvaProp] = useState({})
+  const etiquetas = filas.map(etqTalla)
+  const val = (k, key) => +((cants[k] || {})[key]) || 0
+  const ordenar = (lista) => [...lista].sort((a, b) => ordenTalla(etqTalla(a)) - ordenTalla(etqTalla(b)))
+
+  function tocarTalla(t) {
+    const f = filas.find((x) => x.includes(t))
+    if (f && f.length > 1) { showToast('ℹ️', `La ${t} está unida en ${etqTalla(f)}. Sepárala primero.`); return }
+    if (f) {
+      setFilas(filas.filter((x) => x !== f))
+      setCants((prev) => { const n = { ...prev }; delete n[t]; return n })
+    } else {
+      setFilas(ordenar([...filas, [t]]))
+    }
+    setMarcadas(new Set())
+  }
+  function ninoEnPares() {
+    const pares = [['2', '4'], ['6', '8'], ['10', '12'], ['14', '16']]
+    setFilas(ordenar([...filas.filter((f) => !f.some((t) => TALLAS_NINO.includes(t))), ...pares]))
+    setMarcadas(new Set())
+  }
+  function adultoSaXL() {
+    const usadas = new Set(filas.flat())
+    setFilas(ordenar([...filas, ...['S', 'M', 'L', 'XL'].filter((t) => !usadas.has(t)).map((t) => [t])]))
+  }
+
+  // Unir: solo tallas que van seguidas en la tabla
+  const selUnir = filas.filter((f) => marcadas.has(etqTalla(f)))
+  const idxUnir = selUnir.map((f) => filas.indexOf(f))
+  const seguidas = idxUnir.every((v, i) => !i || v === idxUnir[i - 1] + 1)
+  function unir() {
+    if (selUnir.length < 2 || !seguidas) return
+    const nueva = selUnir.flat()
+    const kNueva = etqTalla(nueva)
+    setCants((prev) => {
+      const n = { ...prev }
+      const suma = {}
+      selUnir.forEach((f) => {
+        const k = etqTalla(f)
+        Object.entries(prev[k] || {}).forEach(([key, v]) => { suma[key] = (suma[key] || 0) + (+v || 0) })
+        delete n[k]
+      })
+      n[kNueva] = suma
+      return n
+    })
+    const i = filas.indexOf(selUnir[0])
+    const resto = filas.filter((f) => !selUnir.includes(f))
+    resto.splice(i, 0, nueva)
+    setFilas(resto)
+    setMarcadas(new Set())
+  }
+  function separar(f) {
+    const k = etqTalla(f)
+    setCants((prev) => { const n = { ...prev }; n[f[0]] = prev[k] || {}; delete n[k]; return n })
+    const i = filas.indexOf(f)
+    const nuevas = [...filas]
+    nuevas.splice(i, 1, ...f.map((t) => [t]))
+    setFilas(nuevas)
+    setMarcadas(new Set())
+  }
+  function marcar(k, on) {
+    setMarcadas((prev) => { const n = new Set(prev); if (on) n.add(k); else n.delete(k); return n })
+  }
+
+  function copiarPrimerColor() {
+    if (cols.length < 2) { showToast('ℹ️', 'Agrega otro color para copiarle las cantidades'); return }
+    setCants((prev) => {
+      const n = { ...prev }
+      Object.keys(n).forEach((k) => {
+        const fila = { ...n[k] }
+        for (let ci = 1; ci < cols.length; ci++) tipos.forEach((t) => {
+          const v = fila[`0_${t}`]
+          if (v) fila[`${ci}_${t}`] = v; else delete fila[`${ci}_${t}`]
+        })
+        n[k] = fila
+      })
+      return n
+    })
+    showToast('📋', 'Cantidades copiadas a todos los colores')
+  }
+
+  // Curva: reparte una cantidad por color entre las tallas según una proporción (ej. 1-2-2-1)
+  const tipoCurva = tipos.includes('cuello') ? 'cuello' : tipos[0]
+  function propDe(f) { const k = etqTalla(f); return curvaProp[k] != null ? curvaProp[k] : String(f.length) }
+  function repartir() {
+    const total = parseInt(curvaTotal, 10) || 0
+    if (!total || !filas.length) { showToast('⚠️', 'Escribe la cantidad y elige tallas'); return }
+    const pr = filas.map((f) => parseFloat(propDe(f)) || 0)
+    const suma = pr.reduce((a, b) => a + b, 0)
+    if (!suma) { showToast('⚠️', 'La proporción no puede ser cero'); return }
+    const rep = pr.map((p) => Math.floor((total * p) / suma))
+    rep[pr.indexOf(Math.max(...pr))] += total - rep.reduce((a, b) => a + b, 0)
+    setCants((prev) => {
+      const n = { ...prev }
+      filas.forEach((f, i) => {
+        const k = etqTalla(f)
+        const fila = { ...(n[k] || {}) }
+        cols.forEach((_, ci) => { if (rep[i] > 0) fila[`${ci}_${tipoCurva}`] = rep[i]; else delete fila[`${ci}_${tipoCurva}`] })
+        n[k] = fila
+      })
+      return n
+    })
+    showToast('✅', `Repartido: ${filas.map((f, i) => `${etqTalla(f)} ${rep[i]}`).join(' · ')} por color`)
+  }
+
+  // Enter baja a la siguiente talla del mismo color y tipo
+  function alTeclear(e) {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    const col = e.target.dataset.col
+    const todos = [...document.querySelectorAll(`.tt input[data-col="${col}"]`)]
+    const sig = todos[todos.indexOf(e.target) + 1] || todos[0]
+    sig?.focus(); sig?.select?.()
+  }
+
+  // Totales
+  const filasSuma = [...etiquetas, ...(psd ? ['SD'] : [])]
+  const totCol = (ci, t) => filasSuma.reduce((s, k) => s + (k === 'SD' && t !== 'puno' ? 0 : val(k, `${ci}_${t}`)), 0)
+  const totFila = (k) => cols.reduce((s, _, ci) => s + tipos.reduce((s2, t) => s2 + val(k, `${ci}_${t}`), 0), 0)
+  const totTipo = (t) => cols.reduce((s, _, ci) => s + totCol(ci, t), 0)
+  const gran = tipos.reduce((s, t) => s + totTipo(t), 0)
+  const precioN = (t) => parseFloat(juego ? precios.juego : precios[t]) || 0
+  const valor = juego ? totTipo('cuello') * precioN('cuello') : tipos.reduce((s, t) => s + totTipo(t) * precioN(t), 0)
+
+  const celda = (k, ci, t) => {
+    if (psd && t === 'puno' && k !== 'SD') return <td key={`${ci}_${t}`} className="na">—</td>
+    if (k === 'SD' && t !== 'puno') return <td key={`${ci}_${t}`} className="na">—</td>
+    const key = `${ci}_${t}`
+    const v = (cants[k] || {})[key] || ''
+    return (
+      <td key={key}>
+        <input type="number" min="0" inputMode="numeric" value={v} placeholder="—" className={v ? 'con' : ''}
+          data-col={key} onKeyDown={alTeclear} onChange={(e) => setV(k, key, e.target.value)}
+          aria-label={`${k === 'SD' ? 'Puño sin dividir' : 'Talla ' + k}, ${nombreColor(cols[ci], ci)}, ${TIPO_LABEL[t]}`} />
+      </td>
+    )
+  }
+
+  const chipTalla = (t) => {
+    const f = filas.find((x) => x.includes(t))
+    const cls = !f ? '' : f.length > 1 ? 'parte' : 'on'
+    return <button key={t} type="button" className={`tchip ${cls}`} onClick={() => tocarTalla(t)} title={f && f.length > 1 ? `Unida en ${etqTalla(f)}` : ''}>{t}</button>
+  }
+
   return (
-    <div className="add-form">
-      <div className="af-title">Nuevo ítem — {tipos.map((t) => `${TIPO_ICON[t]} ${TIPO_LABEL[t]}`).join(' + ')}</div>
-
-      {puedeSerJuego && (
-        <div style={{ background: '#eef3e6', border: '1px solid #a8c98a', borderRadius: 9, padding: '10px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => setEsJuego(v => !v)}>
-          <span style={{ width: 20, height: 20, borderRadius: 5, border: '2px solid #4b8523', background: esJuego ? '#4b8523' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, flexShrink: 0 }}>{esJuego ? '✓' : ''}</span>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#3d6b1c' }}>Cobrar como juego (precio único)</div>
-            <div style={{ fontSize: 11, color: '#6a7d5a' }}>Se cobra una vez por cada cuello — los puños de ese mismo juego van incluidos en ese precio, no se cobran aparte.</div>
-          </div>
+    <div className="ed">
+      <div className="ed-cab">
+        <div className="ed-tit">
+          <span className="ed-num">{editando ? 'Editando ítem' : 'Nuevo ítem'}</span>
+          <InsigniaTipos tipos={tipos} prenda="cam" extra="camiseta" />
         </div>
-      )}
-
-      <div className="g3" style={{ marginBottom: 14 }}>
-        {esJuego && puedeSerJuego ? (
-          <div className="fld">
-            <label>🎽 Precio del juego (pesos, sin puntos)</label>
-            <input type="number" step="1" min="0" placeholder="Ej: 2600" value={precios.juego || ''} onChange={(e) => setPrecios((p) => ({ ...p, juego: e.target.value }))} />
-            {precios.juego > 0 && <span style={{ fontSize: 11, color: 'var(--thread)', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>= {fmtCOP(precios.juego)} c/pieza</span>}
-          </div>
-        ) : (
-          tipos.map((t) => (
-            <div className="fld" key={t}>
-              <label>{TIPO_ICON[t]} Precio {TIPO_LABEL[t]} (pesos, sin puntos)</label>
-              <input type="number" step="1" min="0" placeholder="Ej: 1700" value={precios[t] || ''} onChange={(e) => setPrecios((p) => ({ ...p, [t]: e.target.value }))} />
-              {precios[t] > 0 && <span style={{ fontSize: 11, color: 'var(--thread)', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>= {fmtCOP(precios[t])}</span>}
-            </div>
-          ))
+        {puedeSerJuego && (
+          <label className="ed-juego" title="Se cobra una vez por cada cuello; los puños de ese juego van incluidos">
+            <input type="checkbox" checked={esJuego} onChange={(e) => setEsJuego(e.target.checked)} /> Cobrar como juego
+          </label>
         )}
-        <div className="fld full">
-          <label>Descripción / Diseño</label>
-          <textarea value={diseno} onChange={(e) => setDiseno(e.target.value)} placeholder="Referencia del cliente, tipo de tejido, características..." />
-        </div>
-        <div className="fld full">
-          <label>Imágenes del diseño</label>
-          <div className="img-upload-area">
-            <input type="file" accept="image/*" multiple onChange={onImgs} />
-            <div className="img-upload-label">📷 <strong>Toca para subir fotos</strong><br /><span style={{ fontSize: 11 }}>Puedes añadir varias imágenes</span></div>
-          </div>
-          <div className="img-previews">
-            {imgs.map((src, i) => (
-              <div className="img-thumb" key={i}>
-                <img src={src} alt="" />
-                <button className="img-thumb-del" onClick={() => onDelImg(i)}>✕</button>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
 
-      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ctx)', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>
-        Tabla de tallas × colores
-      </div>
-      <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
-        En cada columna: el color principal arriba, y abajo puedes añadir tantas rayas como necesites, en el orden en que van (Raya 1, Raya 2, Raya 3...).
-      </div>
-
-      <div style={{ marginBottom: 8 }}>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginBottom: 6 }}>
-          <button type="button" onClick={onSelectAllTallas} style={{ fontSize: 11, color: 'var(--thread)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Todas</button>
-          <button type="button" onClick={onClearTallas} style={{ fontSize: 11, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Ninguna</button>
-        </div>
-
-        {[
-          { titulo: 'Niño — individual o unida (usa la que necesites por pedido)', tallas: ['2', '4', '2-4', '6', '8', '6-8', '10', '12', '10-12', '14', '16', '14-16'] },
-          { titulo: 'Adulto', tallas: ['S', 'M', 'L', 'XL', '2XL', '3XL'] },
-        ].map((grupo) => (
-          <div key={grupo.titulo} style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: 10, color: 'var(--muted)', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 4 }}>{grupo.titulo}</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {grupo.tallas.map((t) => {
-                const esCombinada = t.includes('-')
-                const sel = tallasSel.has(t)
-                return (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => onToggleTalla(t)}
-                    title={esCombinada ? 'Talla combinada' : 'Talla individual'}
-                    style={{
-                      padding: '4px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                      border: sel ? '1.5px solid #4b8523' : esCombinada ? '1.5px dashed var(--border)' : '1.5px solid var(--border)',
-                      background: sel ? '#4b8523' : 'var(--white)',
-                      color: sel ? '#fff' : 'var(--muted)',
-                    }}
-                  >
-                    {t}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+      <div className="ed-precios">
+        {juego ? (
+          <label className="ed-precio">
+            <span><IconoPrenda tipo="cuello" prenda="cam" /><IconoPrenda tipo="puno" prenda="cam" />Precio del juego</span>
+            <span className="pre"><b>$</b><input type="number" step="1" min="0" placeholder="2600" value={precios.juego || ''} onChange={(e) => setPrecios((p) => ({ ...p, juego: e.target.value }))} /><small>por juego</small></span>
+          </label>
+        ) : tipos.map((t) => (
+          <label className="ed-precio" key={t}>
+            <span><IconoPrenda tipo={t} prenda="cam" />Precio {TIPO_LABEL[t].toLowerCase()}</span>
+            <span className="pre"><b>$</b><input type="number" step="1" min="0" placeholder={t === 'cuello' ? '1500' : '700'} value={precios[t] || ''} onChange={(e) => setPrecios((p) => ({ ...p, [t]: e.target.value }))} /><small>c/u</small></span>
+          </label>
         ))}
+        {juego && <span className="ed-nota">Se cobra una vez por cada cuello; los puños de ese juego van incluidos.</span>}
       </div>
 
-      {tipos.includes('puno') && (
-        <div
-          onClick={() => setPunoSinDividir((v) => !v)}
-          style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 10, padding: '8px 12px', background: punoSinDividir ? '#eef3e6' : 'var(--loom)', border: '1px solid var(--border)', borderRadius: 8 }}
-        >
-          <span style={{ width: 18, height: 18, borderRadius: 5, border: '2px solid #4b8523', background: punoSinDividir ? '#4b8523' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 11, flexShrink: 0 }}>{punoSinDividir ? '✓' : ''}</span>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#3d6b1c' }}>🧤 Puño sin dividir por talla</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)' }}>Actívalo si vas a cortar puños en una sola cantidad para varias tallas juntas, en vez de repartirlos talla por talla.</div>
+      <div className="ed-fila">
+        <div className="fld ed-dis">
+          <label>Diseño o referencia</label>
+          <textarea value={diseno} onChange={(e) => setDiseno(e.target.value)} placeholder="Referencia del cliente, tipo de tejido, medidas…" rows={2} />
+        </div>
+        <div className="ed-fotos">
+          {imgs.map((src, i) => (
+            <div className="img-thumb" key={i}>
+              <img src={src} alt="" />
+              <button className="img-thumb-del" onClick={() => onDelImg(i)} aria-label="Quitar foto">✕</button>
+            </div>
+          ))}
+          <label className="ed-foto-add" title="Agregar fotos (se comprimen solas)">
+            <input type="file" accept="image/*" multiple onChange={onImgs} />
+            <span>+ Foto</span>
+          </label>
+        </div>
+      </div>
+
+      <div className="ed-sec">
+        <div className="ed-sec-h">
+          <h3>Tallas</h3>
+          <span>Toca las tallas que lleva. Para unir dos o más, márcalas en la tabla y toca <b>Unir</b>.</span>
+        </div>
+        <div className="tallas-sel">
+          <div className="tgrupo"><span className="tg-l">Niño</span><div className="tchips">{TALLAS_NINO.map(chipTalla)}</div></div>
+          <div className="tgrupo"><span className="tg-l">Adulto</span><div className="tchips">{TALLAS_ADULTO.map(chipTalla)}</div></div>
+          <div className="tg-atajos">
+            <button type="button" className="lp-btn" onClick={ninoEnPares}>Niño en pares (2-4, 6-8…)</button>
+            <button type="button" className="lp-btn" onClick={adultoSaXL}>Adulto S a XL</button>
           </div>
+        </div>
+      </div>
+
+      {selUnir.length >= 2 && (
+        <div className="unir-barra">
+          <span>{seguidas ? `Unir ${selUnir.map(etqTalla).join(' + ')} en una sola talla: ${etqTalla(selUnir.flat())}` : 'Solo se pueden unir tallas que van seguidas.'}</span>
+          <button type="button" className="btn btn-p btn-sm" disabled={!seguidas} onClick={unir}>Unir</button>
+          <button type="button" className="unir-cancelar" onClick={() => setMarcadas(new Set())}>Cancelar</button>
         </div>
       )}
 
-      {!tallasSel.size ? (
-        <div style={{ padding: '18px', textAlign: 'center', color: 'var(--muted)', fontSize: 13, border: '1.5px dashed var(--border)', borderRadius: 9 }}>
-          Selecciona arriba las tallas que necesitas para este ítem.
-        </div>
+      {!filas.length && !psd ? (
+        <div className="ed-vacio">Toca arriba las tallas que lleva este ítem.</div>
       ) : (
-      <div className="tscroll cam-scroll">
-        <table className="tg">
-          <thead>
-            <tr>
-              <th className="th-l" rowSpan={2}>Talla</th>
-              {cols.map((c, ci) => (
-                <th key={ci} colSpan={tipos.length} style={{ borderLeft: '2px solid rgba(255,255,255,.2)', verticalAlign: 'top' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '3px 0' }}>
-                    <ColorSwatch nombre={nombreColor(c, ci)} size={11} />
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-                      <input
-                        className="colinp" value={c.principal} placeholder={`Color ${ci + 1}`}
-                        onChange={(e) => setCols((prev) => prev.map((x, i) => (i === ci ? { ...x, principal: e.target.value } : x)))}
-                      />
+        <div className="tt-scroll">
+          <table className="tt">
+            <thead>
+              <tr>
+                <th rowSpan={2} className="tt-talla">Talla</th>
+                {cols.map((c, ci) => (
+                  <th key={ci} colSpan={tipos.length} className="tt-color">
+                    <div className="tt-colh">
+                      <ColorSwatch nombre={nombreColor(c, ci)} size={13} />
+                      <input className="tt-colinp" value={c.principal} placeholder={`Color ${ci + 1}`}
+                        onChange={(e) => setCols((prev) => prev.map((x, i) => (i === ci ? { ...x, principal: e.target.value } : x)))} />
                       <FormulaColorBoton nombreColor={nombreColor(c, ci)} showToast={showToast} />
-                      {cols.length > 1 && <button className="coldel" onClick={() => delCol(ci)}>✕</button>}
+                      {cols.length > 1 && <button type="button" className="tt-x" onClick={() => delCol(ci)} aria-label="Quitar color">×</button>}
                     </div>
                     {(c.rayas || []).map((raya, ridx) => (
-                      <div key={ridx} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <span style={{ fontSize: 8, color: 'var(--yarn)', opacity: .75, flexShrink: 0 }}>R{ridx + 1}</span>
-                        <input
-                          className="colinp" value={raya} placeholder={`raya ${ridx + 1}`}
-                          style={{ width: 58, fontSize: 9 }}
+                      <div key={ridx} className="tt-raya">
+                        <span>raya {ridx + 1}</span>
+                        <input className="tt-colinp" value={raya} placeholder="color"
                           onChange={(e) => setCols((prev) => prev.map((x, i) => {
                             if (i !== ci) return x
                             const nr = [...(x.rayas || [])]; nr[ridx] = e.target.value
                             return { ...x, rayas: nr }
-                          }))}
-                        />
-                        <button
-                          className="coldel" style={{ fontSize: 10 }}
-                          onClick={() => setCols((prev) => prev.map((x, i) => {
-                            if (i !== ci) return x
-                            return { ...x, rayas: (x.rayas || []).filter((_, k) => k !== ridx) }
-                          }))}
-                        >✕</button>
+                          }))} />
+                        <button type="button" className="tt-x" aria-label="Quitar raya" onClick={() => setCols((prev) => prev.map((x, i) => (i !== ci ? x : { ...x, rayas: (x.rayas || []).filter((_, k) => k !== ridx) })))}>×</button>
                       </div>
                     ))}
-                    <button
-                      type="button"
-                      style={{ fontSize: 9, color: 'var(--yarn)', background: 'none', border: '1px dashed rgba(183,228,199,.6)', borderRadius: 4, padding: '1px 7px', cursor: 'pointer' }}
-                      onClick={() => setCols((prev) => prev.map((x, i) => (i === ci ? { ...x, rayas: [...(x.rayas || []), ''] } : x)))}
-                    >＋ raya</button>
-                  </div>
-                </th>
-              ))}
-              <th className="th-add" rowSpan={2} onClick={addCol}><div className="add-col-ico">＋</div></th>
-              <th rowSpan={2}>Total</th>
-            </tr>
-            <tr>
-              {cols.map((_, ci) => tipos.map((t) => (
-                <th key={`${ci}_${t}`} className="th-item-cam" style={{ borderLeft: '1px solid rgba(255,255,255,.15)' }}>{TIPO_LABEL[t]}</th>
-              )))}
-            </tr>
-          </thead>
-          <tbody>
-            {TALLAS.filter((t) => tallasSel.has(t)).map((talla) => {
-              const ri = TALLAS.indexOf(talla)
-              const totFila = cols.reduce((s, _, ci) => s + tipos.reduce((s2, t) => s2 + (+(cants[ri] || {})[`${ci}_${t}`] || 0), 0), 0)
-              return (
-                <tr key={talla}>
-                  <td className="td-key cam">{talla}</td>
-                  {cols.map((_, ci) => tipos.map((t) => {
-                    const key = `${ci}_${t}`
-                    const v = (cants[ri] || {})[key] || ''
-                    return (
-                      <td key={key} className="td-n" style={{ borderLeft: t === tipos[0] ? '2px solid #c8e6c9' : '1px solid var(--border)' }}>
-                        <input type="number" min="0" value={v} placeholder="—" className={v ? 'has-v' : ''} onChange={(e) => setV(ri, key, e.target.value)} />
-                      </td>
-                    )
-                  }))}
-                  <td className="td-tot-end cam">{totFila || ''}</td>
-                </tr>
-              )
-            })}
-            {punoSinDividir && tipos.includes('puno') && (
-              <tr style={{ background: '#fdf8ee' }}>
-                <td className="td-key cam" style={{ fontSize: 11 }}>🧤 Todas (sin dividir)</td>
-                {cols.map((_, ci) => tipos.map((t) => {
-                  if (t !== 'puno') return <td key={`${ci}_${t}`} style={{ textAlign: 'center', color: '#ccc' }}>—</td>
-                  const key = `${ci}_puno`
-                  const v = (cants['SD'] || {})[key] || ''
-                  return (
-                    <td key={key} className="td-n" style={{ borderLeft: '2px solid #c8e6c9' }}>
-                      <input type="number" min="0" value={v} placeholder="—" className={v ? 'has-v' : ''} onChange={(e) => setV('SD', key, e.target.value)} />
-                    </td>
-                  )
-                }))}
-                <td className="td-tot-end cam">
-                  {cols.reduce((s, _, ci) => s + (+(cants['SD'] || {})[`${ci}_puno`] || 0), 0) || ''}
-                </td>
+                    <button type="button" className="tt-addraya" onClick={() => setCols((prev) => prev.map((x, i) => (i === ci ? { ...x, rayas: [...(x.rayas || []), ''] } : x)))}>+ raya</button>
+                  </th>
+                ))}
+                <th rowSpan={2} className="tt-add"><button type="button" onClick={addCol}>+ Color</button></th>
+                <th rowSpan={2} className="tt-tot">Total</th>
               </tr>
-            )}
-            <tr className="tr-tot cam">
-              <td className="td-l">Total</td>
-              {cols.map((_, ci) => tipos.map((t) => {
-                let tot = TALLAS.filter((tl) => tallasSel.has(tl)).reduce((s, tl) => s + (+(cants[TALLAS.indexOf(tl)] || {})[`${ci}_${t}`] || 0), 0)
-                if (punoSinDividir && t === 'puno') tot += (+(cants['SD'] || {})[`${ci}_puno`] || 0)
-                return <td key={`${ci}_${t}`}>{tot || ''}</td>
-              }))}
-              <td className="td-tot-end cam">
-                {(() => {
-                  let gran = TALLAS.filter((tl) => tallasSel.has(tl)).reduce((s, tl) => s + cols.reduce((s2, _, ci) => s2 + tipos.reduce((s3, t) => s3 + (+(cants[TALLAS.indexOf(tl)] || {})[`${ci}_${t}`] || 0), 0), 0), 0)
-                  if (punoSinDividir) gran += cols.reduce((s, _, ci) => s + (+(cants['SD'] || {})[`${ci}_puno`] || 0), 0)
-                  return gran || ''
-                })()}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+              <tr>
+                {cols.map((_, ci) => tipos.map((t) => (
+                  <th key={`${ci}_${t}`} className={`tt-sub ${t === tipos[0] ? 'ini' : ''}`}><IconoPrenda tipo={t} prenda="cam" />{TIPO_LABEL[t]}</th>
+                )))}
+              </tr>
+            </thead>
+            <tbody>
+              {filas.map((f) => {
+                const k = etqTalla(f)
+                const unida = f.length > 1
+                return (
+                  <tr key={k}>
+                    <td className="tt-talla">
+                      <span className="tsel">
+                        <input type="checkbox" checked={marcadas.has(k)} onChange={(e) => marcar(k, e.target.checked)} aria-label={`Marcar ${k} para unir`} />
+                        <span className="tl">{k}</span>
+                        {unida && <><span className="unida">unida</span><button type="button" className="separar" onClick={() => separar(f)}>Separar</button></>}
+                      </span>
+                    </td>
+                    {cols.map((_, ci) => tipos.map((t) => celda(k, ci, t)))}
+                    <td></td>
+                    <td className="tt-tot">{totFila(k) || ''}</td>
+                  </tr>
+                )
+              })}
+              {psd && (
+                <tr className="tt-psd">
+                  <td className="tt-talla"><span className="tsel"><span className="tl">Puño, una sola cantidad</span></span></td>
+                  {cols.map((_, ci) => tipos.map((t) => celda('SD', ci, t)))}
+                  <td></td>
+                  <td className="tt-tot">{totFila('SD') || ''}</td>
+                </tr>
+              )}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td className="tt-talla">Total</td>
+                {cols.map((_, ci) => tipos.map((t) => <td key={`${ci}_${t}`}>{totCol(ci, t) || ''}</td>))}
+                <td></td>
+                <td className="tt-tot">{gran || ''}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       )}
 
-      {tallasSel.size > 0 && (() => {
-        let totalCuelloLive = 0, totalPunoLive = 0
-        TALLAS.filter((t) => tallasSel.has(t)).forEach((talla) => {
-          const ri = TALLAS.indexOf(talla)
-          cols.forEach((_, ci) => {
-            totalCuelloLive += +(cants[ri] || {})[`${ci}_cuello`] || 0
-            totalPunoLive += +(cants[ri] || {})[`${ci}_puno`] || 0
-          })
-        })
-        if (punoSinDividir) {
-          cols.forEach((_, ci) => { totalPunoLive += +(cants['SD'] || {})[`${ci}_puno`] || 0 })
-        }
-        if (!totalCuelloLive && !totalPunoLive) return null
-        return (
-          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', background: 'var(--ink)', borderRadius: 9, padding: '10px 16px', marginTop: 10 }}>
-            {esJuego ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 11, color: 'var(--yarn)', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '.06em' }}>🎽 Total de juegos (cuellos)</span>
-                <span style={{ fontSize: 18, fontWeight: 800, color: '#fff' }}>{totalCuelloLive}</span>
-                {totalPunoLive > 0 && <span style={{ fontSize: 11, color: 'var(--yarn)' }}>+ {totalPunoLive} puños incluidos, sin cobro aparte</span>}
+      <div className="ed-herr">
+        {tipos.includes('puno') && (
+          <label className="ed-juego"><input type="checkbox" checked={punoSinDividir} onChange={(e) => setPunoSinDividir(e.target.checked)} /> Puño en una sola cantidad (sin dividir por talla)</label>
+        )}
+        <span className="ed-sep" />
+        <button type="button" className="lp-btn" onClick={copiarPrimerColor}>Copiar el primer color a los demás</button>
+        <button type="button" className="lp-btn" onClick={() => setCurvaAbierta((v) => !v)}>Repartir por curva</button>
+      </div>
+      {curvaAbierta && (
+        <div className="ed-curva">
+          <div className="ed-curva-t"><b>Repartir por curva.</b> Escribe cuántos {TIPO_LABEL[tipoCurva].toLowerCase()}s lleva cada color y en qué proporción se reparten entre tallas. Ejemplo: 1-2-2-1 pone el doble en M y L.</div>
+          {filas.length ? (
+            <div className="ed-curva-f">
+              <div className="fld"><label>{TIPO_LABEL[tipoCurva]}s por color</label><input type="number" min="0" value={curvaTotal} onChange={(e) => setCurvaTotal(e.target.value)} placeholder="60" style={{ width: 110 }} /></div>
+              <div className="ed-curva-prop">
+                {filas.map((f) => {
+                  const k = etqTalla(f)
+                  return <label key={k}><span>{k}</span><input type="number" min="0" value={propDe(f)} onChange={(e) => setCurvaProp((p) => ({ ...p, [k]: e.target.value }))} /></label>
+                })}
               </div>
-            ) : (
-              <>
-                {tipos.includes('cuello') && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 11, color: 'var(--yarn)', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '.06em' }}>🔵 Total cuellos</span>
-                    <span style={{ fontSize: 18, fontWeight: 800, color: '#fff' }}>{totalCuelloLive}</span>
-                  </div>
-                )}
-                {tipos.includes('puno') && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 11, color: 'var(--yarn)', fontFamily: "'DM Mono', monospace", textTransform: 'uppercase', letterSpacing: '.06em' }}>🧤 Total puños</span>
-                    <span style={{ fontSize: 18, fontWeight: 800, color: '#fff' }}>{totalPunoLive}</span>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )
-      })()}
+              <button type="button" className="btn btn-p btn-sm" onClick={repartir}>Repartir</button>
+            </div>
+          ) : <div className="ed-curva-t">Primero elige las tallas.</div>}
+        </div>
+      )}
 
-      <div className="brow" style={{ marginTop: 12 }}>
-        <button className="btn btn-s btn-sm" onClick={onCancel}>Cancelar</button>
-        <button className="btn btn-p btn-sm" onClick={onSave}>＋ Añadir al pedido</button>
+      {gran > 0 && (
+        <div className="ed-resumen">
+          {juego ? (
+            <span><IconoPrenda tipo="cuello" prenda="cam" /><IconoPrenda tipo="puno" prenda="cam" /><b>{totTipo('cuello')}</b> juegos{totTipo('puno') > 0 && <em> · {totTipo('puno')} puños incluidos</em>}</span>
+          ) : tipos.map((t) => <span key={t}><IconoPrenda tipo={t} prenda="cam" /><b>{totTipo(t)}</b> {TIPO_LABEL[t].toLowerCase()}s</span>)}
+          {valor > 0 && <span className="ed-valor">{fmtCOP(valor)}</span>}
+        </div>
+      )}
+
+      <div className="ed-acc">
+        <button className="lp-btn" onClick={onCancel}>Cancelar</button>
+        <button className="btn btn-p" onClick={onSave}>{editando ? 'Guardar cambios del ítem' : '+ Añadir al pedido'}</button>
       </div>
     </div>
   )
@@ -1097,11 +1163,11 @@ function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, s
 function FormularioChaq({ tipos, rows, cants, diseno, precios, imgs, setDiseno, setPrecios, setV, addRow, delRow, setRows, onImgs, onDelImg, onCancel, onSave, showToast }) {
   return (
     <div className="add-form">
-      <div className="af-title">Nuevo ítem — {tipos.map((t) => `${TIPO_ICON[t]} ${TIPO_LABEL[t]}`).join(' + ')}</div>
+      <div className="af-title">Nuevo ítem — <InsigniaTipos tipos={tipos} prenda="chaq" extra="chaqueta" /></div>
       <div className="g3" style={{ marginBottom: 14 }}>
         {tipos.map((t) => (
           <div className="fld" key={t}>
-            <label>{TIPO_ICON[t]} Precio {TIPO_LABEL[t]} por kilo (pesos, sin puntos)</label>
+            <label className="np-tot-ico"><IconoPrenda tipo={t} prenda="chaq" /> Precio {TIPO_LABEL[t]} por kilo (pesos, sin puntos)</label>
             <input type="number" step="1" min="0" placeholder="Ej: 12000" value={precios[t] || ''} onChange={(e) => setPrecios((p) => ({ ...p, [t]: e.target.value }))} />
             {precios[t] > 0 && <span style={{ fontSize: 11, color: 'var(--jtx)', fontFamily: "'DM Mono', monospace", marginTop: 2 }}>= {fmtCOP(precios[t])}/kg</span>}
           </div>
