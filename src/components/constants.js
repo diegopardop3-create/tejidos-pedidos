@@ -74,7 +74,7 @@ export const NEGOCIO = {
   ciudad: 'Bogotá D.C.',
   // Cómo pagar: aparece en el comprobante solo si se escribe algo aquí.
   // Ejemplo: 'Nequi 313 282 1596\nBancolombia ahorros 000-000000-00'
-  pago: 'Llave Bre-B: @DPP956\nNu Colombia · Cuenta de ahorros 24108820',
+  pago: 'Titular: Diego Alejandro Pardo Pardo\nLlave Bre-B: @DPP956\nNu Colombia · Cuenta de ahorros 24108820',
 }
 
 export function hoy() {
