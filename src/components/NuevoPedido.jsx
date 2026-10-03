@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient'
 import { TALLAS, TALLA_SIN_DIVIDIR, TIPO_LABEL, TIPO_ICON, hoy, ESTADOS, ESTADO_ICON, fmtCOP, totalesPorTipoCam, ordenarTipos } from './constants'
 import ColorSwatch from './ColorSwatch'
 import FormulaColorBoton from './FormulaColorBoton'
+import { InsigniaTipos, InsigniaJuego, IconoPrenda } from './Insignias'
 
 // Reduce una foto (archivo) a máx. 1200 px y la devuelve como texto base64
 // JPEG. Si algo falla (formato raro), devuelve la foto original sin tocar.
@@ -599,7 +600,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
             {TIPOS_CAM.map((t) => (
               <div key={t} className={`ttog ${camSelTipos.has(t) ? 'sel-cam' : ''}`} onClick={() => toggleTipo('cam', t)}>
                 <span className="chk">{camSelTipos.has(t) ? '✓' : ''}</span>
-                <span>{TIPO_ICON[t]}</span> {TIPO_LABEL[t]}
+                <IconoPrenda tipo={t} prenda="cam" /> {TIPO_LABEL[t]}
               </div>
             ))}
           </div>
@@ -649,7 +650,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
             {TIPOS_CHAQ.map((t) => (
               <div key={t} className={`ttog ${chaqSelTipos.has(t) ? 'sel-chaq' : ''}`} onClick={() => toggleTipo('chaq', t)}>
                 <span className="chk">{chaqSelTipos.has(t) ? '✓' : ''}</span>
-                <span>{TIPO_ICON[t]}</span> {TIPO_LABEL[t]}
+                <IconoPrenda tipo={t} prenda="chaq" /> {TIPO_LABEL[t]}
               </div>
             ))}
           </div>
@@ -694,7 +695,6 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
 // ====== Subcomponentes ======
 
 function ItemCardCam({ it, onDelete, onEdit, showToast }) {
-  const tLabel = it.tipos.map((t) => `${TIPO_ICON[t]} ${TIPO_LABEL[t]}`).join(' + ')
   // Usamos el orden guardado explícitamente (it.colores). Si el ítem es viejo
   // y no lo tiene, lo reconstruimos como respaldo (puede no coincidir con el
   // orden original porque Postgres no preserva el orden de un objeto jsonb).
@@ -705,8 +705,8 @@ function ItemCardCam({ it, onDelete, onEdit, showToast }) {
     <div className="iblk cam">
       <div className="iblk-hdr">
         <div className="iblk-label">
-          <span className="badge cam">{tLabel} — Camiseta</span>
-          {(it.es_juego || it.precios?.juego) && <span className="badge cam" style={{ background: '#4b8523', color: '#fff' }}>🎽 Juego {fmtCOP(it.precios.juego || 0)} c/u</span>}
+          <InsigniaTipos tipos={it.tipos} prenda="cam" extra="— Camiseta" />
+          {(it.es_juego || it.precios?.juego) && <InsigniaJuego precio={fmtCOP(it.precios.juego || 0)} />}
           {it.diseno && <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 400 }}>{it.diseno}</span>}
         </div>
         <div className="iblk-meta">
@@ -772,13 +772,12 @@ function derivarColoresCam(tabla) {
 }
 
 function ItemCardChaq({ it, onDelete, onEdit, showToast }) {
-  const tLabel = it.tipos.map((t) => `${TIPO_ICON[t]} ${TIPO_LABEL[t]}`).join(' + ')
   const coloresPresentes = ((it.colores && it.colores.length) ? it.colores : Object.keys(it.tabla || {})).filter((c) => it.tabla && it.tabla[c])
   return (
     <div className="iblk chaq">
       <div className="iblk-hdr">
         <div className="iblk-label">
-          <span className="badge chaq">{tLabel} — Chaqueta</span>
+          <InsigniaTipos tipos={it.tipos} prenda="chaq" extra="— Chaqueta" />
           {it.diseno && <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 400 }}>{it.diseno}</span>}
         </div>
         <div className="iblk-meta">
