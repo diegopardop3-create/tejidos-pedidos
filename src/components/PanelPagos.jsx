@@ -202,7 +202,7 @@ export default function PanelPagos({ pedido, onUpdated, onCambioLocal, showToast
         onClick={() => compact && setExpandido(e => !e)}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 11, fontWeight: 700, fontFamily: "'DM Mono', monospace", color: colorEstado, background: `${colorEstado}18`, padding: '3px 10px', borderRadius: 20 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, fontFamily: "'DM Mono', monospace", color: colorEstado, background: `${colorEstado}18`, padding: '3px 10px', borderRadius: 6 }}>
             {estadoPago === 'Pagado' ? '✅ Pagado' : estadoPago === 'Parcial' ? `💰 Parcial — abonado ${fmtCOP(totalAbonado)}` : '💳 Sin pago'}
           </span>
           {saldoPendiente > 0 && (
