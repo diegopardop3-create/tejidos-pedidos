@@ -84,7 +84,7 @@ body { font-family: 'Inter', sans-serif; background: var(--loom); color: var(--i
 .sec-chaq { background: var(--jbg); border-color: var(--jbd); }
 .sec-hdr { display: flex; align-items: center; justify-content: space-between; padding: 13px 18px; cursor: pointer; user-select: none; }
 .sec-title { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
-.sbadge { font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 20px; font-family: 'DM Mono', monospace; }
+.sbadge { font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 6px; font-family: 'DM Mono', monospace; }
 .sb-cam { background: #d0f0dc; color: var(--ctx); }
 .sb-chaq { background: #fff0d0; color: var(--jtx); }
 .sarrow { font-size: 16px; color: var(--muted); transition: transform .2s; flex-shrink: 0; }
@@ -237,12 +237,18 @@ td.con-falta { box-shadow: inset 0 0 0 1.5px #e8a49c; }
 .iblk.chaq .iblk-hdr { background: #fff4e0; }
 .iblk-label { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .iblk-meta { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.badge { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; font-family: 'DM Mono', monospace; white-space: nowrap; animation: badgePop .32s cubic-bezier(.34,1.56,.64,1); transition: transform .15s ease; }
+.badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 7px; border-radius: 6px; font-size: 11px; font-weight: 700; font-family: 'DM Mono', monospace; white-space: nowrap; animation: badgePop .32s cubic-bezier(.34,1.56,.64,1); transition: transform .15s ease; }
 .badge:hover { transform: scale(1.06); }
 .badge.cam { background: #d0f0dc; color: var(--ctx); }
 .badge.chaq { background: #fff0d0; color: var(--jtx); }
+/* Iconos de prenda dentro de las insignias */
+.ico-prenda { width: 20px; height: 20px; flex-shrink: 0; object-fit: contain; }
+.ico-prenda.ancho { width: 34px; height: auto; }
+.ttog .ico-prenda { width: 22px; height: 22px; margin-right: 2px; vertical-align: middle; }
+.ttog .ico-prenda.ancho { width: 36px; height: auto; }
+.badge { flex-wrap: wrap; white-space: normal; }
 @keyframes badgePop { from { opacity: 0; transform: scale(.75); } to { opacity: 1; transform: scale(1); } }
-.itot { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 700; color: var(--thread); background: var(--weave); padding: 3px 10px; border-radius: 20px; }
+.itot { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 700; color: var(--thread); background: var(--weave); padding: 3px 10px; border-radius: 6px; }
 .itot.pend { color: var(--warn); background: #fff8e1; }
 .iblk-body { padding: 10px 14px; }
 
