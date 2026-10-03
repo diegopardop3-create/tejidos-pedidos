@@ -2,9 +2,10 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 import NuevoPedido from './NuevoPedido'
 import ListaPedidos from './ListaPedidos'
+import Entregados from './Entregados'
 import Resumen from './Resumen'
 import ListaPrecios from './ListaPrecios'
-import BuscadorColores from './BuscadorColores'
+import Colores from './Colores'
 import DetalleModal from './DetalleModal'
 import ConfirmarEliminar from './ConfirmarEliminar'
 import logo from '../assets/logo.png'
@@ -120,6 +121,14 @@ export default function Pedidos({ session }) {
     await supabase.auth.signOut()
   }
 
+  // Abre el detalle de un pedido a partir de su id (desde Resumen o Colores).
+  function abrirPedidoPorId(id) {
+    const i = pedidos.findIndex((p) => p.id === id)
+    if (i < 0) return
+    setDetalleIdx(i)
+    cargarFotos(id)
+  }
+
   pedidosRef.current = pedidos
   const nActivos = pedidos.filter((p) => p.estado !== 'Entregado').length
   const nEntregados = pedidos.length - nActivos
@@ -195,11 +204,10 @@ export default function Pedidos({ session }) {
         )}
 
         {tab === 'entregados' && (
-          <ListaPedidos
-            pedidos={pedidos.filter(p => p.estado === 'Entregado')}
+          <Entregados
+            pedidos={pedidos.filter((p) => p.estado === 'Entregado')}
             loading={loading}
-            onVerDetalle={(idx) => {
-              const p = pedidos.filter(p => p.estado === 'Entregado')[idx]
+            onVerDetalle={(p) => {
               setDetalleIdx(pedidos.indexOf(p))
               cargarFotos(p.id)
             }}
@@ -208,8 +216,6 @@ export default function Pedidos({ session }) {
             actualizarPedidoLocal={actualizarPedidoLocal}
             onEliminar={(pedido) => setPedidoAEliminar(pedido)}
             showToast={showToast}
-            titulo="Pedidos Entregados"
-            soloEntregados
           />
         )}
 
@@ -218,18 +224,13 @@ export default function Pedidos({ session }) {
             pedidos={pedidos}
             showToast={showToast}
             actualizarPedidoLocal={actualizarPedidoLocal}
-            onAbrirPedido={(id) => {
-              const i = pedidos.findIndex((p) => p.id === id)
-              if (i < 0) return
-              setDetalleIdx(i)
-              cargarFotos(id)
-            }}
+            onAbrirPedido={abrirPedidoPorId}
           />
         )}
 
         {tab === 'precios' && <ListaPrecios showToast={showToast} />}
 
-        {tab === 'colores' && <BuscadorColores showToast={showToast} />}
+        {tab === 'colores' && <Colores pedidos={pedidos} showToast={showToast} onAbrirPedido={abrirPedidoPorId} />}
       </div>
 
       {detalleIdx !== null && (
