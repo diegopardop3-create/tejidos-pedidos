@@ -526,10 +526,10 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
       <div className="ctitle">{editPedido ? `Editando Pedido ${editPedido.numero}` : 'Registrar Nuevo Pedido'}</div>
 
       {borradorDetectado && (
-        <div style={{ background: '#fff3cd', border: '1px solid #e8c96a', borderRadius: 9, padding: '12px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ background: 'var(--jbg)', border: '1px solid var(--jbd)', borderRadius: 9, padding: '12px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div style={{ fontSize: 13 }}>
             <strong>📋 Tienes un borrador sin terminar</strong>
-            <div style={{ fontSize: 12, color: '#6a5010', marginTop: 3 }}>
+            <div style={{ fontSize: 12, color: 'var(--jtx)', marginTop: 3 }}>
               {borradorDetectado.cliente ? `Cliente: ${borradorDetectado.cliente} · ` : ''}
               {(borradorDetectado.tempCam?.length || 0) + (borradorDetectado.tempChaq?.length || 0)} ítem(s) añadido(s) — las fotos no quedaron en el borrador.
             </div>
@@ -553,7 +553,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
             autoComplete="off"
           />
           {sugerenciasAbiertas && sugerenciasCliente.length > 0 && (
-            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 30, background: '#fff', border: '1px solid var(--border)', borderRadius: 8, marginTop: 4, maxHeight: 200, overflowY: 'auto', boxShadow: '0 6px 20px rgba(0,0,0,.15)' }}>
+            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 30, background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 8, marginTop: 4, maxHeight: 200, overflowY: 'auto', boxShadow: '0 6px 20px rgba(0,0,0,.15)' }}>
               {sugerenciasCliente.map((c) => (
                 <button
                   key={c}
@@ -1219,7 +1219,7 @@ function FormularioChaq({ tipos, rows, cants, diseno, precios, imgs, setDiseno, 
                       {(col.rayas || []).length > 0 && (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                           {col.rayas.map((raya, ridx) => (
-                            <div key={ridx} style={{ display: 'flex', alignItems: 'center', gap: 2, background: '#fff8e8', borderRadius: 5, padding: '1px 4px' }}>
+                            <div key={ridx} style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'var(--jbg)', borderRadius: 5, padding: '1px 4px' }}>
                               <span style={{ fontSize: 8, color: 'var(--jtx)', flexShrink: 0 }}>R{ridx + 1}</span>
                               <input
                                 value={raya} placeholder="color" style={{ width: 54, fontSize: 10, border: 'none', background: 'none', outline: 'none' }}
