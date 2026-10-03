@@ -44,10 +44,10 @@ function textoDias(d) {
 // Camiseta y chaqueta se muestran en líneas separadas para que un "cuello"
 // de camiseta nunca se confunda con uno de chaqueta.
 function plural(n, sing, plu) {
-  return `${n} ${n === 1 ? sing : plu}`
+  return `${n.toLocaleString('es-CO')} ${n === 1 ? sing : plu}`
 }
 
-function unidadesCamiseta(items) {
+export function unidadesCamiseta(items) {
   let juegos = 0, cuellos = 0, punos = 0
   for (const it of (items || [])) {
     const { cuello, puno } = totalesPorTipoCam(it.tabla)
@@ -61,7 +61,7 @@ function unidadesCamiseta(items) {
   return partes.join(' · ')
 }
 
-function unidadesChaqueta(items) {
+export function unidadesChaqueta(items) {
   let pretina = 0, cuello = 0, puno = 0
   for (const it of (items || [])) {
     // En chaqueta la tabla va por color (sin tallas): tabla[color][tipo]
@@ -76,6 +76,42 @@ function unidadesChaqueta(items) {
   if (cuello > 0) partes.push(plural(cuello, 'cuello', 'cuellos'))
   if (puno > 0) partes.push(plural(puno, 'puño', 'puños'))
   return partes.join(' · ')
+}
+
+// CSV con una fila por celda (talla/color/tipo). Lo usan Activos y Entregados.
+export function exportarCSV(pedidos, showToast) {
+  if (!pedidos.length) { showToast('⚠️', 'No hay pedidos'); return }
+  const rows = [['N°', 'Fecha', 'Cliente', 'Estado', 'Sección', 'Tipo(s)', 'Talla', 'Color', 'Tipo ítem', 'Cantidad', 'Precio', 'Estado celda', 'Diseño']]
+  pedidos.forEach((p) => {
+    ;(p.items_camiseta || []).forEach((it) => {
+      Object.entries(it.tabla || {}).forEach(([talla, tObj]) => {
+        Object.entries(tObj).forEach(([color, cObj]) => {
+          it.tipos.forEach((t) => {
+            const n = cObj[t] || 0
+            if (!n) return
+            const est = (it.estados || {})[`${talla}|${color}|${t}`] || '—'
+            rows.push([p.numero, p.fecha, p.cliente, p.estado, 'Camiseta', it.tipos.map((x) => TIPO_LABEL[x]).join('+'), talla, color, TIPO_LABEL[t], n, fmtCOP(it.precios[t] || 0), est, it.diseno || ''])
+          })
+        })
+      })
+    })
+    ;(p.items_chaqueta || []).forEach((it) => {
+      Object.entries(it.tabla || {}).forEach(([color, rObj]) => {
+        it.tipos.forEach((t) => {
+          const n = rObj[t] || 0
+          if (!n) return
+          const est = (it.estados || {})[`${color}|${t}`] || '—'
+          rows.push([p.numero, p.fecha, p.cliente, p.estado, 'Chaqueta', it.tipos.map((x) => TIPO_LABEL[x]).join('+'), '—', color, TIPO_LABEL[t], n, fmtCOP(it.precios[t] || 0) + '/kg', est, it.diseno || ''])
+        })
+      })
+    })
+  })
+  const csv = rows.map((r) => r.map((v) => '"' + String(v || '').replace(/"/g, '""') + '"').join(',')).join('\n')
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }))
+  a.download = 'pedidos-' + new Date().toISOString().slice(0, 10) + '.csv'
+  a.click()
+  showToast('⬇️', 'CSV exportado')
 }
 
 export default function ListaPedidos({ pedidos, loading, onVerDetalle, onEliminar, onCompartir, showToast, refrescar, actualizarPedidoLocal, titulo = 'Pedidos', soloEntregados = false }) {
@@ -111,40 +147,7 @@ export default function ListaPedidos({ pedidos, loading, onVerDetalle, onElimina
     }
   }
 
-  function exportCSV() {
-    if (!pedidos.length) { showToast('⚠️', 'No hay pedidos'); return }
-    const rows = [['N°', 'Fecha', 'Cliente', 'Estado', 'Sección', 'Tipo(s)', 'Talla', 'Color', 'Tipo ítem', 'Cantidad', 'Precio', 'Estado celda', 'Diseño']]
-    pedidos.forEach((p) => {
-      ;(p.items_camiseta || []).forEach((it) => {
-        Object.entries(it.tabla || {}).forEach(([talla, tObj]) => {
-          Object.entries(tObj).forEach(([color, cObj]) => {
-            it.tipos.forEach((t) => {
-              const n = cObj[t] || 0
-              if (!n) return
-              const est = (it.estados || {})[`${talla}|${color}|${t}`] || '—'
-              rows.push([p.numero, p.fecha, p.cliente, p.estado, 'Camiseta', it.tipos.map((x) => TIPO_LABEL[x]).join('+'), talla, color, TIPO_LABEL[t], n, fmtCOP(it.precios[t] || 0), est, it.diseno || ''])
-            })
-          })
-        })
-      })
-      ;(p.items_chaqueta || []).forEach((it) => {
-        Object.entries(it.tabla || {}).forEach(([color, rObj]) => {
-          it.tipos.forEach((t) => {
-            const n = rObj[t] || 0
-            if (!n) return
-            const est = (it.estados || {})[`${color}|${t}`] || '—'
-            rows.push([p.numero, p.fecha, p.cliente, p.estado, 'Chaqueta', it.tipos.map((x) => TIPO_LABEL[x]).join('+'), '—', color, TIPO_LABEL[t], n, fmtCOP(it.precios[t] || 0) + '/kg', est, it.diseno || ''])
-          })
-        })
-      })
-    })
-    const csv = rows.map((r) => r.map((v) => '"' + String(v || '').replace(/"/g, '""') + '"').join(',')).join('\n')
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }))
-    a.download = 'pedidos-' + new Date().toISOString().slice(0, 10) + '.csv'
-    a.click()
-    showToast('⬇️', 'CSV exportado')
-  }
+  const exportCSV = () => exportarCSV(pedidos, showToast)
 
   // Datos calculados de un pedido que usan la tabla y el tablero.
   function datos(p) {
