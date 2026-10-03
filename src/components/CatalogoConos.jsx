@@ -282,7 +282,7 @@ export default function CatalogoConos({ showToast }) {
                       <div style={{ fontWeight: 700, fontSize: 14, textDecoration: agotado ? 'line-through' : 'none' }}>{c.nombre}</div>
                       {c.nota && <div style={{ fontSize: 11, color: 'var(--muted)' }}>{c.nota}</div>}
                     </div>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: est.color, border: `1px solid ${est.color}`, borderRadius: 20, padding: '2px 9px', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: est.color, border: `1px solid ${est.color}`, borderRadius: 6, padding: '2px 9px', whiteSpace: 'nowrap' }}>
                       {est.label}
                     </span>
                     <select
