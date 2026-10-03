@@ -130,7 +130,7 @@ async function cambiarEstado(nuevoEstado) {
 
         {pr.total > 0 && (
           <>
-            <div style={{ background: 'var(--ink)', borderRadius: 8, padding: '10px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ background: 'var(--bar, #1a3c63)', borderRadius: 8, padding: '10px 14px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 14 }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 10, fontFamily: "'DM Mono', monospace", color: 'var(--yarn)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 5 }}>Progreso de producción</div>
                 <div className="prog-wrap" style={{ height: 8 }}><div className="prog-bar" style={{ width: `${pr.pct}%` }} /></div>
@@ -339,7 +339,7 @@ function ItemCamView({ it, estados, itemIndice, onEtapa, onFaltan, onImgClick, s
                   <td className="td-key cam">{talla}</td>
                   {coloresPresentes.map((c) => it.tipos.map((t) => {
                     const n = (tallaObj[c] || {})[t] || 0
-                    if (!n) return <td key={`${c}_${t}`} style={{ borderLeft: t === it.tipos[0] ? '2px solid #c8e6c9' : '1px solid var(--border)', textAlign: 'center', color: '#ccc' }}>—</td>
+                    if (!n) return <td key={`${c}_${t}`} style={{ borderLeft: t === it.tipos[0] ? '2px solid var(--cbd)' : '1px solid var(--border)', textAlign: 'center', color: '#ccc' }}>—</td>
                     totFila += n
                     const base = `${talla}|${c}|${t}`
                     const etapa = etapaCelda(estados, base)
@@ -348,7 +348,7 @@ function ItemCamView({ it, estados, itemIndice, onEtapa, onFaltan, onImgClick, s
                       <td
                         key={`${c}_${t}`}
                         className={`celda-td ${faltan > 0 ? 'con-falta' : ''}`}
-                        style={{ borderLeft: t === it.tipos[0] ? '2px solid #c8e6c9' : '1px solid var(--border)' }}
+                        style={{ borderLeft: t === it.tipos[0] ? '2px solid var(--cbd)' : '1px solid var(--border)' }}
                       >
                         <div className="celda-wrap">
                           <CeldaEtapa
@@ -387,7 +387,7 @@ function ItemCamView({ it, estados, itemIndice, onEtapa, onFaltan, onImgClick, s
         const { cuello, puno } = totalesPorTipoCam(it.tabla)
         const esJuego = it.precios?.juego
         return (
-          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8, padding: '8px 12px', background: 'var(--ink)', borderRadius: 7 }}>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8, padding: '8px 12px', background: 'var(--bar, #1a3c63)', borderRadius: 7 }}>
             {esJuego ? (
               <span style={{ fontSize: 12, color: 'var(--yarn)' }}>🎽 Total de juegos (cuellos): <strong style={{ color: '#fff' }}>{cuello}</strong>{puno > 0 && ` · +${puno} puños incluidos`}</span>
             ) : (
