@@ -291,8 +291,7 @@ function ItemCamView({ it, estados, itemIndice, onEtapa, onFaltan, onImgClick, s
     <div style={{ background: 'var(--loom)', border: '1px solid var(--cbd)', borderRadius: 9, padding: 12, marginBottom: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <InsigniaTipos tipos={it.tipos} prenda="cam" />
-          {it.precios?.juego && <InsigniaJuego precio={fmtCOP(it.precios.juego)} />}
+          {it.precios?.juego ? <InsigniaJuego precio={fmtCOP(it.precios.juego)} /> : <InsigniaTipos tipos={it.tipos} prenda="cam" />}
           {it.diseno && <span style={{ fontSize: 12, color: 'var(--muted)' }}>{it.diseno}</span>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -377,27 +376,18 @@ function ItemCamView({ it, estados, itemIndice, onEtapa, onFaltan, onImgClick, s
         <div className="item-imgs">{it.imagenes.map((s, i) => <img key={i} className="item-img" src={s} alt="" onClick={() => onImgClick(s)} />)}</div>
       )}
 
-      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, fontFamily: "'DM Mono', monospace" }}>
-        {it.precios?.juego
-          ? `Juego (cuello + puño incluido): ${fmtCOP(it.precios.juego)} por cuello`
-          : it.tipos.map((t) => `${TIPO_LABEL[t]}: ${fmtCOP(it.precios[t] || 0)}/u`).join(' · ')}
-      </div>
-
+      {/* Cantidades y precio unitario en una sola línea (el total en $ ya
+          está arriba, junto a Faltantes). En juego se cuenta por cuellos. */}
       {(() => {
         const { cuello, puno } = totalesPorTipoCam(it.tabla)
-        const esJuego = it.precios?.juego
-        return (
-          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8, padding: '8px 12px', background: 'var(--bar, #1a3c63)', borderRadius: 7 }}>
-            {esJuego ? (
-              <span style={{ fontSize: 12, color: 'var(--yarn)' }}>🎽 Total de juegos (cuellos): <strong style={{ color: '#fff' }}>{cuello}</strong>{puno > 0 && ` · +${puno} puños incluidos`}</span>
-            ) : (
-              <>
-                {cuello > 0 && <span style={{ fontSize: 12, color: 'var(--yarn)' }}>🔵 Total cuellos: <strong style={{ color: '#fff' }}>{cuello}</strong></span>}
-                {puno > 0 && <span style={{ fontSize: 12, color: 'var(--yarn)' }}>🧤 Total puños: <strong style={{ color: '#fff' }}>{puno}</strong></span>}
-              </>
-            )}
-          </div>
-        )
+        const u = (n) => n.toLocaleString('es-CO')
+        const partes = it.precios?.juego
+          ? [`${u(cuello)} juego${cuello === 1 ? '' : 's'} × ${fmtCOP(it.precios.juego)}`, ...(puno !== cuello ? [`${u(puno)} puños`] : [])]
+          : it.tipos.map((t) => {
+            const n = t === 'cuello' ? cuello : puno
+            return `${u(n)} ${t === 'cuello' ? 'cuello' : 'puño'}${n === 1 ? '' : 's'} × ${fmtCOP(it.precios[t] || 0)}`
+          })
+        return <div className="det-linea">{partes.join(' · ')}</div>
       })()}
     </div>
   )
@@ -426,7 +416,7 @@ function ItemChaqView({ it, estados, itemIndice, estadoPedido, onEtapa, onFaltan
           >
             🔴 Faltantes
           </button>
-          <span className={`itot ${it.kilos_reales ? '' : 'pend'}`}>{it.kilos_reales ? `✅ ${fmtCOP(it.total_final)}` : '⚖️ Pendiente de pesaje'}</span>
+          <span className={`itot ${it.kilos_reales ? '' : 'pend'}`}>{it.kilos_reales ? `${it.kilos_reales} kg · ${fmtCOP(it.total_final)}` : '⚖️ Pendiente de pesaje'}</span>
         </div>
       </div>
 
@@ -476,8 +466,8 @@ function ItemChaqView({ it, estados, itemIndice, estadoPedido, onEtapa, onFaltan
         <div className="item-imgs">{it.imagenes.map((s, i) => <img key={i} className="item-img" src={s} alt="" onClick={() => onImgClick(s)} />)}</div>
       )}
 
-      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, fontFamily: "'DM Mono', monospace" }}>
-        {it.tipos.map((t) => `${TIPO_LABEL[t]}: ${fmtCOP(it.precios[t] || 0)}/kg`).join(' · ')} · {it.total_unidades} piezas
+      <div className="det-linea">
+        {it.total_unidades} piezas · {it.tipos.map((t) => `${TIPO_LABEL[t]} ${fmtCOP(it.precios[t] || 0)}/kg`).join(' · ')}
       </div>
 
       {estadoPedido !== 'Entregado' ? (
@@ -490,8 +480,6 @@ function ItemChaqView({ it, estados, itemIndice, estadoPedido, onEtapa, onFaltan
             <button className="btn btn-p btn-sm" onClick={() => onPesaje(it, kg)}>Guardar</button>
           </div>
         </div>
-      ) : it.kilos_reales ? (
-        <div style={{ fontSize: 12, color: 'var(--thread)', marginTop: 6, fontWeight: 600 }}>✅ {it.kilos_reales} kg · {fmtCOP(it.total_final)}</div>
       ) : null}
     </div>
   )
