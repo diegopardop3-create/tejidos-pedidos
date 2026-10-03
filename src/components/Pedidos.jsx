@@ -213,7 +213,19 @@ export default function Pedidos({ session }) {
           />
         )}
 
-        {tab === 'resumen' && <Resumen pedidos={pedidos} session={session} showToast={showToast} />}
+        {tab === 'resumen' && (
+          <Resumen
+            pedidos={pedidos}
+            showToast={showToast}
+            actualizarPedidoLocal={actualizarPedidoLocal}
+            onAbrirPedido={(id) => {
+              const i = pedidos.findIndex((p) => p.id === id)
+              if (i < 0) return
+              setDetalleIdx(i)
+              cargarFotos(id)
+            }}
+          />
+        )}
 
         {tab === 'precios' && <ListaPrecios showToast={showToast} />}
 
