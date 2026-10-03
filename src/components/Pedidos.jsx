@@ -121,52 +121,41 @@ export default function Pedidos({ session }) {
   }
 
   pedidosRef.current = pedidos
-  const totalPedidos = pedidos.length
-  const totalPendientes = pedidos.filter((p) => p.estado === 'Pendiente').length
+  const nActivos = pedidos.filter((p) => p.estado !== 'Entregado').length
+  const nEntregados = pedidos.length - nActivos
+  const PESTANAS = [
+    ['nuevo', <><span className="hnav-mas">+</span>Nuevo pedido</>],
+    ['lista', <>Activos {!loading && <span className="hnav-n">{nActivos}</span>}</>],
+    ['entregados', <>Entregados {!loading && <span className="hnav-n">{nEntregados}</span>}</>],
+    ['resumen', 'Resumen'],
+    ['precios', 'Precios'],
+    ['colores', 'Colores'],
+  ]
 
   return (
     <div className="app-root">
       <header className="hdr">
-        <div className="hbrand">
-          <img src={logo} alt="L&L Tejidos y Confecciones" className="hlogo" />
-          <div>
-            <div className="htitle">Tejidos y Confecciones Laura Lizeth</div>
-            <div className="hsub">GESTIÓN DE PRODUCCIÓN</div>
+        <div className="hdr-in">
+          <div className="hdr-fila">
+            {/* Del logo completo se muestra solo el tejido con las agujas,
+                recortado con background-position para que se lea en pequeño. */}
+            <div className="hsello" style={{ backgroundImage: `url(${logo})` }} role="img" aria-label="Logo de L & L Tejidos y Confecciones" />
+            <div className="hmarca">L &amp; L<small>Tejidos y Confecciones</small></div>
+            <div className="huser">
+              <span className="huser-mail">{session.user.email}</span>
+              <button className="logout-btn" onClick={handleLogout}>Salir</button>
+            </div>
           </div>
-        </div>
-        <div className="hstats">
-          <div className="hst"><strong>{totalPedidos}</strong> pedidos</div>
-          <div className="hst"><strong>{totalPendientes}</strong> pendientes</div>
-          <div className="huser">
-            <span>{session.user.email}</span>
-            <button className="logout-btn" onClick={handleLogout}>Salir</button>
-          </div>
+          <nav className="hnav" aria-label="Secciones">
+            {PESTANAS.map(([id, txt]) => (
+              <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{txt}</button>
+            ))}
+          </nav>
         </div>
       </header>
 
       <div className="wrap">
-        <div className="tabs">
-          <button className={`tab ${tab === 'nuevo' ? 'on' : ''}`} onClick={() => setTab('nuevo')}>
-            ＋ Nuevo Pedido
-          </button>
-          <button className={`tab ${tab === 'lista' ? 'on' : ''}`} onClick={() => setTab('lista')}>
-            📋 Activos
-          </button>
-          <button className={`tab ${tab === 'entregados' ? 'on' : ''}`} onClick={() => setTab('entregados')}>
-            ✅ Entregados
-          </button>
-          <button className={`tab ${tab === 'resumen' ? 'on' : ''}`} onClick={() => setTab('resumen')}>
-            📊 Resumen
-          </button>
-          <button className={`tab ${tab === 'precios' ? 'on' : ''}`} onClick={() => setTab('precios')}>
-            🏷️ Precios
-          </button>
-          <button className={`tab ${tab === 'colores' ? 'on' : ''}`} onClick={() => setTab('colores')}>
-            🎨 Colores
-          </button>
-        </div>
-
-                {/* Se mantiene SIEMPRE montado (solo se esconde con display:none) en
+        {/* Se mantiene SIEMPRE montado (solo se esconde con display:none) en
             vez de crearlo y destruirlo con cada cambio de pestaña. Antes,
             cambiar a Activos u otra pestaña mientras se armaba un pedido
             nuevo borraba todo lo que llevabas — ahora el formulario sigue
