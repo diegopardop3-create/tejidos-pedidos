@@ -7,6 +7,30 @@
 export const TALLA_SIN_DIVIDIR = 'Todas (sin dividir)'
 
 export const TALLAS = ['2', '4', '2-4', '6', '8', '6-8', '10', '12', '10-12', '14', '16', '14-16', 'S', 'M', 'L', 'XL', '2XL', '3XL']
+
+// ---- Tallas unidas ----
+// Cada fila de la tabla de un ítem es un grupo de tallas seguidas: ['M'] es
+// una talla sola y ['M', 'L'] es la talla unida "M-L". En la base de datos la
+// fila se guarda con su etiqueta ("M-L"), igual que antes se guardaba "2-4",
+// así que los pedidos viejos se leen sin cambios.
+export const TALLAS_NINO = ['2', '4', '6', '8', '10', '12', '14', '16']
+export const TALLAS_ADULTO = ['S', 'M', 'L', 'XL', '2XL', '3XL']
+export const TALLAS_BASE = [...TALLAS_NINO, ...TALLAS_ADULTO]
+export const etqTalla = (grupo) => grupo.join('-')
+export const partesTalla = (etq) => String(etq).split('-')
+// Posición de una etiqueta para ordenar filas: va donde está su primera talla.
+export function ordenTalla(etq) {
+  const p = partesTalla(etq)
+  const i = TALLAS_BASE.indexOf(p[0])
+  return (i < 0 ? 999 : i) + p.length / 100
+}
+// Etiquetas de talla que tiene la tabla de un ítem de camiseta, en orden
+// (sin la fila especial del puño sin dividir).
+export function tallasDeTabla(tabla) {
+  return Object.keys(tabla || {})
+    .filter((k) => k !== TALLA_SIN_DIVIDIR)
+    .sort((a, b) => ordenTalla(a) - ordenTalla(b) || a.localeCompare(b))
+}
 export const TIPO_LABEL = { puno: 'Puño', cuello: 'Cuello', pretina: 'Pretina' }
 export const TIPO_ICON = { puno: '🧤', cuello: '🔵', pretina: '📏' }
 
