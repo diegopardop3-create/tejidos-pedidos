@@ -10,9 +10,8 @@ import { unidadesCamiseta, unidadesChaqueta, exportarCSV } from './ListaPedidos'
 // ENTREGADOS
 // ============================================
 // El historial de lo que ya salió del taller, agrupado por el mes en que se
-// entregó. Arriba, los totales de lo que se está viendo (cambian con la
-// búsqueda y los filtros): cuántos pedidos, cuánto se facturó, cuánto falta
-// por cobrar y cuántos días se demora en promedio un pedido en salir.
+// entregó. Las cifras del negocio (producido, por cobrar, tiempo en el
+// taller) están en Resumen para no repetirlas aquí.
 
 const Ico = {
   buscar: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>,
@@ -48,13 +47,6 @@ function nombreMes(clave) {
   const [y, m] = clave.split('-').map(Number)
   return `${MESES[m - 1]} ${y}`
 }
-// Días entre la fecha del pedido y la entrega (solo si las dos existen).
-function diasEnTaller(p) {
-  if (!p.fecha_entregado || !p.fecha) return null
-  const d = Math.round((aFecha(String(p.fecha_entregado).slice(0, 10)) - aFecha(String(p.fecha).slice(0, 10))) / 86400000)
-  return d >= 0 ? d : null
-}
-
 export default function Entregados({ pedidos, loading, onVerDetalle, onEliminar, onCompartir, showToast, refrescar, actualizarPedidoLocal }) {
   const [busqueda, setBusqueda] = useState('')
   const [mes, setMes] = useState('')
@@ -70,20 +62,6 @@ export default function Entregados({ pedidos, loading, onVerDetalle, onEliminar,
     (!q || `${p.cliente} ${p.numero}`.toLowerCase().includes(q)) &&
     (!mes || claveMes(fechaEntrega(p)) === mes) &&
     (!soloSaldo || saldoDe(p) > 0))
-
-  const facturado = filas.reduce((s, p) => s + totalReal(p), 0)
-  const porCobrar = filas.reduce((s, p) => s + saldoDe(p), 0)
-  const conDias = filas.map(diasEnTaller).filter((d) => d != null)
-  const promedioDias = conDias.length ? Math.round(conDias.reduce((a, b) => a + b, 0) / conDias.length) : null
-
-  // Subtotales por mes, para la fila que separa cada mes.
-  const porMes = {}
-  for (const p of filas) {
-    const k = claveMes(fechaEntrega(p))
-    porMes[k] = porMes[k] || { n: 0, v: 0 }
-    porMes[k].n++
-    porMes[k].v += totalReal(p)
-  }
 
   // Devuelve un pedido al taller (queda en "Listo"), por si se marcó
   // entregado por error. Se ve al instante; si falla el guardado se revierte.
@@ -128,13 +106,6 @@ export default function Entregados({ pedidos, loading, onVerDetalle, onEliminar,
       </div>
 
       <div className="twrap en-panel">
-        <div className="en-totales">
-          <div><b>{filas.length}</b>pedido{filas.length === 1 ? '' : 's'}</div>
-          <div><b>{fmtCOP(facturado)}</b>facturado</div>
-          <div className={porCobrar > 0 ? 'rojo' : ''}><b>{fmtCOP(porCobrar)}</b>por cobrar</div>
-          {promedioDias != null && <div><b>{promedioDias} día{promedioDias === 1 ? '' : 's'}</b>tiempo medio en el taller</div>}
-        </div>
-
         {loading ? (
           <div className="empty"><div className="empty-ico">⏳</div><p>Cargando…</p></div>
         ) : !filas.length ? (
@@ -163,10 +134,7 @@ export default function Entregados({ pedidos, loading, onVerDetalle, onEliminar,
                   <Fragment key={p.id}>
                     {cabecera && (
                       <tr className="en-mesfila">
-                        <td colSpan={7}>
-                          <span>{nombreMes(k)}</span>
-                          <span>{porMes[k].n} pedido{porMes[k].n === 1 ? '' : 's'} · {fmtCOP(porMes[k].v)}</span>
-                        </td>
+                        <td colSpan={7}>{nombreMes(k)}</td>
                       </tr>
                     )}
                     <tr className={pagoAbierto ? 'abierto' : ''} onClick={() => onVerDetalle(p)}>
