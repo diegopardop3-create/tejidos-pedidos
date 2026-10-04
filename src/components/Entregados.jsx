@@ -4,6 +4,7 @@ import { MESES, fmtCOP } from './constants'
 import { imprimirEtiqueta } from './factura'
 import PanelPagos from './PanelPagos'
 import { InsigniaTipos } from './Insignias'
+import { ConoHilo } from './Movimiento'
 import { unidadesCamiseta, unidadesChaqueta, exportarCSV } from './ListaPedidos'
 
 // ============================================
@@ -107,9 +108,9 @@ export default function Entregados({ pedidos, loading, onVerDetalle, onEliminar,
 
       <div className="twrap en-panel">
         {loading ? (
-          <div className="empty"><div className="empty-ico">⏳</div><p>Cargando…</p></div>
+          <div className="empty"><ConoHilo /><p>Cargando…</p></div>
         ) : !filas.length ? (
-          <div className="empty"><div className="empty-ico">🧵</div>
+          <div className="empty"><ConoHilo girando={false} />
             <p>{q || mes || soloSaldo ? 'Ningún pedido entregado coincide con la búsqueda' : 'Aún no hay pedidos entregados'}</p>
           </div>
         ) : (
