@@ -263,17 +263,18 @@ export function calcProgreso(pedido) {
   return { total, ok, falta, pct: total ? Math.round((ok / total) * 100) : 0 }
 }
 
-// Avance por color: cuántas celdas de cada color ya están empacadas. Sirve
-// para la página del cliente. Une "Rojo" y "ROJO" como el mismo color.
+// Avance por color: cuántas celdas de cada color están tejidas (tej) y cuántas
+// ya empacadas (ok). Sirve para la página del cliente. Une "Rojo" y "ROJO".
 export function progresoPorColor(pedido) {
   const mapa = new Map()
-  const sumar = (color, ok) => {
+  const sumar = (color, etapa) => {
     const k = String(color).trim().toLowerCase()
     if (!k) return
     const nombre = k.charAt(0).toUpperCase() + k.slice(1)
-    const a = mapa.get(k) || { color: nombre, total: 0, ok: 0 }
+    const a = mapa.get(k) || { color: nombre, total: 0, ok: 0, tej: 0 }
     a.total++
-    if (ok) a.ok++
+    if (etapa === 'empacado') a.ok++
+    else if (etapa === 'tejido') a.tej++
     mapa.set(k, a)
   }
   ;(pedido.items_camiseta || []).forEach((it) => {
@@ -281,7 +282,7 @@ export function progresoPorColor(pedido) {
     Object.entries(it.tabla || {}).forEach(([talla, porColor]) => {
       Object.entries(porColor).forEach(([color, col]) => {
         ;(it.tipos || []).forEach((t) => {
-          if (col[t] > 0) sumar(color, etapaCelda(estados, `${talla}|${color}|${t}`) === 'empacado')
+          if (col[t] > 0) sumar(color, etapaCelda(estados, `${talla}|${color}|${t}`))
         })
       })
     })
@@ -290,9 +291,9 @@ export function progresoPorColor(pedido) {
     const estados = it.estados || {}
     Object.entries(it.tabla || {}).forEach(([color, fila]) => {
       ;(it.tipos || []).forEach((t) => {
-        if (fila[t] > 0) sumar(color, etapaCelda(estados, `${color}|${t}`) === 'empacado')
+        if (fila[t] > 0) sumar(color, etapaCelda(estados, `${color}|${t}`))
       })
     })
   })
-  return [...mapa.values()].map((c) => ({ ...c, pct: c.total ? Math.round((c.ok / c.total) * 100) : 0 }))
+  return [...mapa.values()].map((c) => ({ ...c, pct: c.total ? Math.round((c.ok / c.total) * 100) : 0, pctTej: c.total ? Math.round(((c.ok + c.tej) / c.total) * 100) : 0 }))
 }
