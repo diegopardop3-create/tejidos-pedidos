@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { MESES, fmtCOP, calcProgreso, totalesPorTipoCam } from './constants'
 import { InsigniaTipos } from './Insignias'
+import { Anillo, CuentaNum } from './Movimiento'
 
 // ============================================
 // RESUMEN
@@ -76,6 +77,9 @@ export default function Resumen({ pedidos, showToast, onAbrirPedido, actualizarP
   const prodAnt = producido(sel - 1)
   const variacion = prodAnt > 0 ? Math.round(((prodSel - prodAnt) / prodAnt) * 100) : null
   const entregadosSel = pedSel.filter((p) => p.estado === 'Entregado').length
+  const nListoMes = pedSel.filter((p) => p.estado === 'Listo').length
+  const nProcMes = pedSel.filter((p) => p.estado === 'En proceso').length
+  const nPendMes = pedSel.filter((p) => p.estado === 'Pendiente').length
   // Tiempo medio en el taller de los pedidos del mes que ya se entregaron.
   const diasSel = pedSel.map(diasEnTaller).filter((d) => d != null)
   const promedioDias = diasSel.length ? Math.round(diasSel.reduce((a, b) => a + b, 0) / diasSel.length) : null
@@ -194,25 +198,41 @@ export default function Resumen({ pedidos, showToast, onAbrirPedido, actualizarP
       <div className="rs-kpis">
         <div className={`rs-kpi ${porCobrar > 0 ? 'alerta' : ''}`}>
           <div className="lbl">Por cobrar hoy</div>
-          <div className="val">{fmtCOP(porCobrar)}</div>
+          <div className="val"><CuentaNum valor={porCobrar} formato={(n) => fmtCOP(Math.round(n))} /></div>
           <div className="pie">{porCobrar > 0 ? `${clientesDeben} cliente${clientesDeben === 1 ? '' : 's'} con saldo` : 'Todos al día'}</div>
         </div>
         <div className="rs-kpi">
           <div className="lbl">Producido en {mm}</div>
-          <div className="val">{fmtCOP(prodSel)}</div>
+          <div className="val"><CuentaNum valor={prodSel} formato={(n) => fmtCOP(Math.round(n))} /></div>
           <div className={`pie ${sel === mesHoy || variacion == null ? '' : variacion >= 0 ? 'sube' : 'baja'}`}>
             {sel === mesHoy ? 'El mes va en curso' : variacion == null ? 'Sin datos del mes anterior' : `${variacion >= 0 ? '▲' : '▼'} ${Math.abs(variacion)}% frente a ${nombreMes(sel - 1).toLowerCase()}`}
           </div>
         </div>
         <div className="rs-kpi">
           <div className="lbl">Pedidos de {mm}</div>
-          <div className="val">{pedSel.length}</div>
-          <div className="pie">{entregadosSel} entregado{entregadosSel === 1 ? '' : 's'} · {pedSel.length - entregadosSel} en el taller</div>
+          <div className="rs-anillo-fila">
+            <Anillo
+              segmentos={[
+                { valor: entregadosSel, color: 'var(--yarn)' },
+                { valor: nListoMes, color: 'var(--thread)' },
+                { valor: nProcMes, color: 'var(--ink)' },
+                { valor: nPendMes, color: 'var(--jtx)' },
+              ]}
+              total={pedSel.length}
+              centro={<CuentaNum valor={pedSel.length} />}
+              sub={pedSel.length === 1 ? 'pedido' : 'pedidos'}
+            />
+            <div className="rs-leyenda">
+              {[['Entregados', entregadosSel, 'var(--yarn)'], ['Listos', nListoMes, 'var(--thread)'], ['En proceso', nProcMes, 'var(--ink)'], ['Pendientes', nPendMes, 'var(--jtx)']]
+                .filter(([, n]) => n > 0)
+                .map(([t, n, c]) => <span key={t}><i className="lp-punto" style={{ background: c }} />{t} <b>{n}</b></span>)}
+            </div>
+          </div>
           {promedioDias != null && <div className="pie">Tardan {promedioDias} día{promedioDias === 1 ? '' : 's'} en promedio en salir</div>}
         </div>
         <div className="rs-kpi">
           <div className="lbl">En el taller hoy</div>
-          <div className="val">{enTaller} <small>pedido{enTaller === 1 ? '' : 's'}</small></div>
+          <div className="val"><CuentaNum valor={enTaller} /> <small>pedido{enTaller === 1 ? '' : 's'}</small></div>
           <div className="rs-flujo" aria-hidden="true">
             {nPend > 0 && <i style={{ flex: nPend, background: 'var(--jtx)' }} />}
             {nProc > 0 && <i style={{ flex: nProc, background: 'var(--ink)' }} />}
@@ -272,7 +292,7 @@ export default function Resumen({ pedidos, showToast, onAbrirPedido, actualizarP
                 return (
                   <g key={b.k} className="barra" onClick={() => setSel(b.k)}>
                     <rect x={cx - slot / 2 + 2} y={top} width={slot - 4} height={H + 22} fill="transparent" />
-                    <rect x={cx - bw / 2} y={y(b.v)} width={bw} height={Math.max(0, top + H - y(b.v))} rx="3" fill={on ? 'var(--thread)' : 'var(--ink)'} opacity={on ? 1 : 0.3} />
+                    <rect className="bar-r" style={{ '--i': i }} x={cx - bw / 2} y={y(b.v)} width={bw} height={Math.max(0, top + H - y(b.v))} rx="3" fill={on ? 'var(--thread)' : 'var(--ink)'} opacity={on ? 1 : 0.3} />
                     <text x={cx} y={top + H + 16} textAnchor="middle" className={on ? 'on' : ''}>{MES_CORTO[b.k % 12]}</text>
                     {on && b.v > 0 && <text x={cx} y={y(b.v) - 6} textAnchor="middle" className="on">{textoMillones(b.v)}</text>}
                   </g>
