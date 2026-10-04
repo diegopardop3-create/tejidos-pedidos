@@ -262,3 +262,37 @@ export function calcProgreso(pedido) {
   })
   return { total, ok, falta, pct: total ? Math.round((ok / total) * 100) : 0 }
 }
+
+// Avance por color: cuántas celdas de cada color ya están empacadas. Sirve
+// para la página del cliente. Une "Rojo" y "ROJO" como el mismo color.
+export function progresoPorColor(pedido) {
+  const mapa = new Map()
+  const sumar = (color, ok) => {
+    const k = String(color).trim().toLowerCase()
+    if (!k) return
+    const nombre = k.charAt(0).toUpperCase() + k.slice(1)
+    const a = mapa.get(k) || { color: nombre, total: 0, ok: 0 }
+    a.total++
+    if (ok) a.ok++
+    mapa.set(k, a)
+  }
+  ;(pedido.items_camiseta || []).forEach((it) => {
+    const estados = it.estados || {}
+    Object.entries(it.tabla || {}).forEach(([talla, porColor]) => {
+      Object.entries(porColor).forEach(([color, col]) => {
+        ;(it.tipos || []).forEach((t) => {
+          if (col[t] > 0) sumar(color, etapaCelda(estados, `${talla}|${color}|${t}`) === 'empacado')
+        })
+      })
+    })
+  })
+  ;(pedido.items_chaqueta || []).forEach((it) => {
+    const estados = it.estados || {}
+    Object.entries(it.tabla || {}).forEach(([color, fila]) => {
+      ;(it.tipos || []).forEach((t) => {
+        if (fila[t] > 0) sumar(color, etapaCelda(estados, `${color}|${t}`) === 'empacado')
+      })
+    })
+  })
+  return [...mapa.values()].map((c) => ({ ...c, pct: c.total ? Math.round((c.ok / c.total) * 100) : 0 }))
+}
