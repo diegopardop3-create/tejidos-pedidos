@@ -857,3 +857,64 @@ table.tt tfoot td { font-family: 'DM Mono', monospace; font-weight: 500; color: 
 
 /* Detalle del pedido: una sola línea con cantidades y precio por ítem */
 .det-linea { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted); margin-top: 8px; }
+
+/* ============================================
+   MOVIMIENTO: hilos del login, anillos, cono, pasos del cliente
+   ============================================ */
+.mv-cono { display: block; margin: 0 auto 10px; overflow: visible; }
+.mv-gira { animation: mv-gira 1.1s linear infinite; }
+@keyframes mv-gira { to { transform: translateY(11px); } }
+
+.mv-anillo { position: relative; width: 96px; height: 96px; flex: none; }
+.mv-anillo svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.mv-anillo circle { fill: none; stroke-width: 4.4; }
+.mv-anillo .fondo { stroke: var(--border); }
+.mv-anillo .seg { animation: mv-anilla 1.1s cubic-bezier(.3, .8, .3, 1) both; }
+.mv-anillo.redondo .seg { stroke-linecap: round; }
+@keyframes mv-anilla { from { stroke-dasharray: 0 100; } }
+.mv-anillo .centro { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.mv-anillo .centro b { font-family: 'DM Mono', monospace; font-size: 20px; font-weight: 500; line-height: 1; color: var(--ink); }
+.mv-anillo .centro small { font-size: 10px; color: var(--muted); margin-top: 3px; }
+
+.rs-graf .barra rect.bar-r { transform-box: fill-box; transform-origin: 50% 100%; animation: mv-crece .9s cubic-bezier(.3, .8, .3, 1) both; animation-delay: calc(var(--i, 0) * 110ms); }
+@keyframes mv-crece { from { transform: scaleY(0); } }
+
+.rs-anillo-fila { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.rs-anillo-fila .rs-leyenda { flex-direction: column; gap: 4px; flex: 1; min-width: 96px; }
+.rs-anillo-fila .rs-leyenda span { display: flex; width: 100%; }
+.rs-anillo-fila .rs-leyenda b { margin-left: auto; }
+
+.empty .mv-cono { margin-bottom: 14px; }
+
+/* Inicio de sesión: hilos que se tejen detrás del formulario */
+.lg-hilos { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.lg-hilos path { fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 0; opacity: .7; animation: mv-tejer 6s ease-in-out infinite alternate; }
+.lg-hilos path:nth-child(2) { animation-delay: .8s; }
+.lg-hilos path:nth-child(3) { animation-delay: 1.6s; }
+.lg-hilos path:nth-child(4) { animation-delay: 2.4s; }
+@keyframes mv-tejer { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+
+/* Página del cliente: etapas del pedido y avance de producción */
+.vp-pasos { position: relative; display: flex; justify-content: space-between; margin-top: 12px; }
+.vp-pasos::before, .vp-pasos .vp-relleno { content: ""; position: absolute; left: 11px; right: 11px; top: 10px; height: 3px; border-radius: 3px; }
+.vp-pasos::before { background: repeating-linear-gradient(90deg, #b9b49c 0 6px, transparent 6px 11px); }
+.vp-pasos .vp-relleno { right: auto; width: calc((100% - 22px) * var(--p, 0) / 3); background: #4b8523; transition: width .9s cubic-bezier(.4, .1, .2, 1); }
+.vp-paso { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; width: 25%; font-size: 11px; font-weight: 700; text-align: center; color: #7b8a6a; }
+.vp-paso .pt { width: 23px; height: 23px; border-radius: 50%; background: #fffdf8; border: 3px solid #b9b49c; }
+.vp-paso.hecho { color: #1a3c63; }
+.vp-paso.hecho .pt { background: #4b8523; border-color: #4b8523; }
+.vp-paso.actual .pt { animation: mv-pulso 1.8s ease-out infinite; }
+@keyframes mv-pulso { 0% { box-shadow: 0 0 0 0 rgba(75, 133, 35, .55); } 100% { box-shadow: 0 0 0 12px rgba(75, 133, 35, 0); } }
+.vp-avance { margin-top: 18px; padding-top: 14px; border-top: 1.5px dashed #c9c4ad; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; text-align: left; }
+.vp-avance .mv-anillo .fondo { stroke: #e2ddc8; }
+.vp-avance .mv-anillo .centro b { color: #1a3c63; }
+.vp-avance .mv-anillo .centro small { color: #6a7d5a; }
+.vp-chips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 150px; }
+.vp-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; padding: 4px 9px 4px 7px; border-radius: 99px; background: #fff; border: 1px solid #d9d4bd; color: #1a3c63; }
+.vp-chip.ok { background: #e8efdc; border-color: #4b8523; }
+.vp-chip em { font-style: normal; font-family: 'DM Mono', monospace; font-weight: 500; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mv-gira, .mv-anillo .seg, .rs-graf .barra rect.bar-r, .lg-hilos path, .vp-paso.actual .pt { animation: none !important; }
+  .vp-pasos .vp-relleno { transition: none; }
+}
