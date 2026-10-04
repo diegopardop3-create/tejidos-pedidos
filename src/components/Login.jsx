@@ -21,6 +21,12 @@ export default function Login() {
 
   return (
     <div style={styles.wrap}>
+      <svg className="lg-hilos" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+        <path pathLength="1" stroke="#4b8523" d="M-20 120 C 160 20, 260 300, 420 170 S 700 60, 820 190" />
+        <path pathLength="1" stroke="#1a3c63" d="M-20 250 C 180 330, 300 90, 470 260 S 680 400, 820 280" />
+        <path pathLength="1" stroke="#4b8523" d="M-20 380 C 140 260, 300 480, 450 380 S 700 250, 820 400" />
+        <path pathLength="1" stroke="#1a3c63" d="M-20 500 C 200 440, 320 600, 500 510 S 700 430, 820 520" />
+      </svg>
       <div style={styles.card}>
         <div style={styles.brand}>
           <img src={logo} alt="L&L" style={styles.logoImg} />
@@ -79,8 +85,12 @@ const styles = {
     background: '#f5f2e7',
     fontFamily: "'Inter', sans-serif",
     padding: 16,
+    position: 'relative',
+    overflow: 'hidden',
   },
   card: {
+    position: 'relative',
+    zIndex: 1,
     background: '#fffdf8',
     border: '1px solid #dde3d2',
     borderRadius: 16,
