@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { TIPO_LABEL, fmtFecha, fmtCOP, calcProgreso, ESTADO_ICON, PAGO_COLOR, PAGO_ICON } from './constants'
+import { TIPO_LABEL, fmtFecha, fmtCOP, calcProgreso, progresoPorColor, PAGO_COLOR } from './constants'
+import ColorSwatch from './ColorSwatch'
+import { Anillo, ConoHilo } from './Movimiento'
 import logo from '../assets/logo.png'
+
+// Etapas que ve el cliente, en el orden en que avanza un pedido.
+const ETAPAS = [['Pendiente', 'Recibido'], ['En proceso', 'En producción'], ['Listo', 'Listo'], ['Entregado', 'Entregado']]
 
 // Vista pública de un pedido: se accede por enlace con token, sin necesidad
 // de iniciar sesión. Solo lectura — el cliente ve el estado de su pedido.
@@ -30,7 +35,7 @@ export default function VistaPublica({ token }) {
   }, [token])
 
   if (pedido === undefined) {
-    return <div style={styles.center}><p style={{ color: '#6a7d5a' }}>Cargando pedido…</p></div>
+    return <div style={{ ...styles.center, flexDirection: 'column' }}><ConoHilo /><p style={{ color: '#6a7d5a' }}>Cargando pedido…</p></div>
   }
   if (pedido === null) {
     return (
@@ -45,6 +50,8 @@ export default function VistaPublica({ token }) {
   }
 
   const pr = calcProgreso(pedido)
+  const porColor = progresoPorColor(pedido)
+  const etapa = Math.max(0, ETAPAS.findIndex(([e]) => e === pedido.estado))
   const totalCam = pedido.total_camiseta || 0
   const hayChaq = (pedido.items_chaqueta || []).length > 0
   const totChaqFinal = (pedido.items_chaqueta || []).reduce((s, it) => s + (it.total_final || 0), 0)
@@ -74,17 +81,28 @@ export default function VistaPublica({ token }) {
         </div>
 
         <div style={styles.estadoBox}>
-          <div style={styles.k}>Estado actual</div>
-          <div style={styles.estadoVal}>{ESTADO_ICON[pedido.estado]} {pedido.estado}</div>
-        </div>
-
-        {pr.total > 0 && (
-          <div style={{ marginTop: 18 }}>
-            <div style={styles.k}>Progreso de producción</div>
-            <div style={styles.progWrap}><div style={{ ...styles.progBar, width: `${pr.pct}%` }} /></div>
-            <div style={{ fontSize: 12, color: '#6a7d5a', marginTop: 4 }}>{pr.ok} de {pr.total} listas {pr.falta > 0 ? `· ${pr.falta} pendientes` : ''}</div>
+          <div style={styles.k}>Estado de tu pedido</div>
+          <div className="vp-pasos" style={{ '--p': etapa }} role="img" aria-label={`Estado actual: ${ETAPAS[etapa][1]}`}>
+            <span className="vp-relleno" />
+            {ETAPAS.map(([, nombre], i) => (
+              <div key={nombre} className={`vp-paso ${i <= etapa ? 'hecho' : ''} ${i === etapa && etapa < 3 ? 'actual' : ''}`}>
+                <span className="pt" />{nombre}
+              </div>
+            ))}
           </div>
-        )}
+          {pr.total > 0 && etapa < 2 && (
+            <div className="vp-avance">
+              <Anillo segmentos={[{ valor: pr.ok, color: '#4b8523' }]} total={pr.total} centro={`${pr.pct} %`} sub={`${pr.ok} de ${pr.total}`} />
+              <div className="vp-chips">
+                {porColor.map((c) => (
+                  <span key={c.color} className={`vp-chip ${c.pct === 100 ? 'ok' : ''}`}>
+                    <ColorSwatch nombre={c.color} size={10} />{c.color} <em>{c.pct === 100 ? '✓' : `${c.pct} %`}</em>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         <div style={{ marginTop: 22 }}>
           <div style={styles.sectionTitle}>Productos</div>
@@ -173,10 +191,7 @@ const styles = {
   infoGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16, textAlign: 'left' },
   k: { fontSize: 10, color: '#6a7d5a', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: "'DM Mono', monospace" },
   v: { fontSize: 14, fontWeight: 600, color: '#1a3c63', marginTop: 2 },
-  estadoBox: { background: '#f1f6ec', borderRadius: 10, padding: '14px 18px', textAlign: 'left', marginBottom: 4 },
-  estadoVal: { fontSize: 18, fontWeight: 700, color: '#1a3c63', marginTop: 4 },
-  progWrap: { background: '#eee', borderRadius: 20, height: 8, marginTop: 6, overflow: 'hidden' },
-  progBar: { background: '#4b8523', height: '100%', borderRadius: 20 },
+  estadoBox: { background: '#f1f6ec', borderRadius: 10, padding: '14px 18px 18px', textAlign: 'left', marginBottom: 4 },
   sectionTitle: { fontSize: 11, fontWeight: 700, color: '#6a7d5a', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10, textAlign: 'left', fontFamily: "'DM Mono', monospace" },
   itemRow: { display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #eee', fontSize: 13, textAlign: 'left' },
   totalBox: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, paddingTop: 16, borderTop: '2px solid #1a3c63', color: '#4b8523' },
