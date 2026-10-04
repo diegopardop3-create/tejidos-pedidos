@@ -4,6 +4,7 @@ import { TIPO_LABEL, TIPO_ICON, fmtCOP, calcProgreso, totalesPorTipoCam, ESTADOS
 import { imprimirEtiqueta } from './factura'
 import PanelPagos from './PanelPagos'
 import { InsigniaTipos } from './Insignias'
+import { ConoHilo } from './Movimiento'
 
 // Iconos simples para los botones de cada fila (heredan el color del botón).
 const Ico = {
@@ -217,7 +218,7 @@ export default function ListaPedidos({ pedidos, loading, onVerDetalle, onElimina
   )
 
   const vacio = (
-    <div className="empty"><div className="empty-ico">🧵</div>
+    <div className="empty"><ConoHilo girando={false} />
       <p>{busqueda || filEstado ? 'Ningún pedido coincide con la búsqueda' : soloEntregados ? 'Aún no hay pedidos entregados' : 'No hay pedidos en el taller'}</p>
     </div>
   )
@@ -260,7 +261,7 @@ export default function ListaPedidos({ pedidos, loading, onVerDetalle, onElimina
       </div>
 
       {loading ? (
-        <div className="twrap"><div className="empty"><div className="empty-ico">⏳</div><p>Cargando…</p></div></div>
+        <div className="twrap"><div className="empty"><ConoHilo /><p>Cargando…</p></div></div>
       ) : !soloEntregados && modo === 'tablero' ? (
         <div className="lp-tablero">
           {etapas.map((e) => {
