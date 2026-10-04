@@ -51,6 +51,8 @@ export default function VistaPublica({ token }) {
 
   const pr = calcProgreso(pedido)
   const porColor = progresoPorColor(pedido)
+  const soloTej = porColor.reduce((n, c) => n + c.tej, 0)
+  const pctTej = pr.total ? Math.round(((pr.ok + soloTej) / pr.total) * 100) : 0
   const etapa = Math.max(0, ETAPAS.findIndex(([e]) => e === pedido.estado))
   const totalCam = pedido.total_camiseta || 0
   const hayChaq = (pedido.items_chaqueta || []).length > 0
@@ -92,11 +94,21 @@ export default function VistaPublica({ token }) {
           </div>
           {pr.total > 0 && etapa < 2 && (
             <div className="vp-avance">
-              <Anillo segmentos={[{ valor: pr.ok, color: '#4b8523' }]} total={pr.total} centro={`${pr.pct} %`} sub={`${pr.ok} de ${pr.total}`} />
+              <Anillo
+                segmentos={[{ valor: pr.ok, color: '#4b8523' }, { valor: soloTej, color: '#9fd06e' }]}
+                total={pr.total}
+                centro={`${pctTej} %`}
+                sub="tejido"
+              />
+              <div className="vp-leyenda">
+                <span><i style={{ background: '#9fd06e' }} />Tejidas <b>{pr.ok + soloTej} de {pr.total}</b></span>
+                <span><i style={{ background: '#4b8523' }} />Empacadas <b>{pr.ok} de {pr.total}</b></span>
+              </div>
               <div className="vp-chips">
                 {porColor.map((c) => (
                   <span key={c.color} className={`vp-chip ${c.pct === 100 ? 'ok' : ''}`}>
-                    <ColorSwatch nombre={c.color} size={10} />{c.color} <em>{c.pct === 100 ? '✓' : `${c.pct} %`}</em>
+                    <ColorSwatch nombre={c.color} size={10} />{c.color} <em>{c.pct === 100 ? '✓' : `${c.pctTej} %`}</em>
+                    <u className="vp-mini"><s style={{ width: `${c.pct}%` }} /><s className="t" style={{ width: `${c.pctTej - c.pct}%` }} /></u>
                   </span>
                 ))}
               </div>
