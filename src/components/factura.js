@@ -236,6 +236,7 @@ export async function generarFacturaPDF(pedido) {
       </div>
       <div>
         <div class="lbl">Emitido por</div>
+        ${NEGOCIO.nombre ? `<p><b>${esc(NEGOCIO.nombre)}</b></p>` : ''}
         ${NEGOCIO.nit ? `<p>NIT ${esc(NEGOCIO.nit)}</p>` : ''}
         ${NEGOCIO.direccion ? `<p>${esc(NEGOCIO.direccion)}${NEGOCIO.ciudad ? `, ${esc(NEGOCIO.ciudad)}` : ''}</p>` : ''}
         ${NEGOCIO.telefono ? `<p>Tel. ${esc(NEGOCIO.telefono)}</p>` : ''}
