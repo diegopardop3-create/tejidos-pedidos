@@ -323,7 +323,7 @@ export function imprimirEtiqueta(pedido) {
   </style>
   </head><body>
     <div class="hoja">
-      <div class="marca">L &amp; L · Tejidos y Confecciones</div>
+      <div class="marca">L y L · Tejidos y Confecciones</div>
       <div class="linea"></div>
       <div class="numero">${pedido.numero}</div>
       <div class="cliente">${pedido.cliente}</div>

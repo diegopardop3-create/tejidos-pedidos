@@ -67,7 +67,7 @@ export const PAGO_ICON = { 'Pendiente': '💳', 'Parcial': '💰', 'Pagado': '�
 export const PAGO_COLOR = { 'Pendiente': '#e67e22', 'Parcial': '#f0a500', 'Pagado': '#4b8523' }
 
 export const NEGOCIO = {
-  nombre: 'L & L Tejidos y Confecciones',
+  nombre: 'L y L Tejidos y Confecciones',
   nit: '80.262.959-2',
   direccion: 'Carrera 73H No. 58A-06 Sur',
   telefono: '313 282 1596',
