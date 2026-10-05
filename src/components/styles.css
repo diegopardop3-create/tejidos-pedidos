@@ -33,6 +33,17 @@ body { font-family: 'Inter', sans-serif; background: var(--loom); color: var(--i
 .huser { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 12px; color: rgba(255,255,255,.66); }
 .logout-btn { background: rgba(255,255,255,.08); color: #fff; border: 1px solid rgba(255,255,255,.15); padding: 5px 11px; border-radius: 7px; font-size: 12px; cursor: pointer; font-family: 'Inter', sans-serif; }
 .logout-btn:hover { background: rgba(255,255,255,.15); }
+/* Botón Recargar: mismo tono que "Salir", con el verde del hilo como acento */
+.recargar-btn { display: inline-flex; align-items: center; gap: 6px; background: rgba(168,201,138,.12); color: var(--yarn); border: 1px solid rgba(168,201,138,.32); padding: 5px 11px; border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; transition: background .15s, color .15s, border-color .15s; }
+.recargar-btn svg { transition: transform .45s ease; }
+.recargar-btn:hover { background: rgba(168,201,138,.22); color: #fff; border-color: rgba(168,201,138,.55); }
+.recargar-btn:hover svg { transform: rotate(-120deg); }
+.recargar-btn:focus-visible { outline: 2px solid var(--yarn); outline-offset: 2px; }
+.recargar-btn:disabled { cursor: default; }
+.recargar-btn.girando svg { animation: recargar-giro .6s linear infinite; }
+@keyframes recargar-giro { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@media (max-width: 560px) { .recargar-txt { display: none; } .recargar-btn { padding: 6px 8px; } }
+@media (prefers-reduced-motion: reduce) { .recargar-btn svg, .recargar-btn.girando svg { transition: none; animation: none; } }
 .hnav { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
 .hnav::-webkit-scrollbar { display: none; }
 .hnav button { background: none; border: 0; color: rgba(255,255,255,.66); padding: 10px 14px 12px; font-weight: 600; font-size: 13px; white-space: nowrap; border-bottom: 3px solid transparent; display: flex; align-items: center; gap: 7px; cursor: pointer; font-family: 'Inter', sans-serif; transition: color .15s; }

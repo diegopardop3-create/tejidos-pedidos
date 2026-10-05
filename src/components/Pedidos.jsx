@@ -117,6 +117,16 @@ export default function Pedidos({ session }) {
     }
   }
 
+  // Recarga la página completa (trae también la versión más nueva de la app)
+  // y vuelve a mostrar el logo tejiéndose: ?intro hace que App lo active.
+  const [recargando, setRecargando] = useState(false)
+  function recargar() {
+    setRecargando(true)
+    const u = new URL(window.location.href)
+    u.searchParams.set('intro', '')
+    window.setTimeout(() => window.location.assign(u.toString()), 350)
+  }
+
   async function handleLogout() {
     await supabase.auth.signOut()
   }
@@ -150,6 +160,19 @@ export default function Pedidos({ session }) {
             <div className="hsello" style={{ backgroundImage: `url(${logo})` }} role="img" aria-label="Logo de L & L Tejidos y Confecciones" />
             <div className="huser">
               <span className="huser-mail">{session.user.email}</span>
+              <button
+                className={`recargar-btn${recargando ? ' girando' : ''}`}
+                onClick={recargar}
+                disabled={recargando}
+                title="Recargar la página"
+                aria-label="Recargar la página"
+              >
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+                  <path d="M20 4v4.5h-4.5" />
+                </svg>
+                <span className="recargar-txt">Recargar</span>
+              </button>
               <button className="logout-btn" onClick={handleLogout}>Salir</button>
             </div>
           </div>
