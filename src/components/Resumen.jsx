@@ -11,10 +11,6 @@ import { Anillo, CuentaNum } from './Movimiento'
 // los pedidos de ese mes y lo que está en el taller ahora. Debajo, la lista
 // de cosas por atender, la gráfica de producido por mes (tocar una barra
 // cambia de mes), los clientes por lo que deben y lo que más se vendió.
-//
-// Reporte mensual: el día 1 de cada mes llega solo por correo (las variables
-// de entorno ya están en Vercel). Para apagarlo sin borrar código, poner false.
-const REPORTE_MENSUAL_ACTIVO = true
 
 const MES_CORTO = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
@@ -55,7 +51,6 @@ export default function Resumen({ pedidos, showToast, onAbrirPedido, actualizarP
   const hoy = new Date()
   const mesHoy = claveMes(hoy.getFullYear(), hoy.getMonth())
   const [sel, setSel] = useState(mesHoy)
-  const [enviando, setEnviando] = useState(false)
 
   // Meses disponibles: desde el primer pedido hasta el mes actual.
   const meses = pedidos.map(mesDe).filter((x) => x != null)
@@ -153,25 +148,6 @@ export default function Resumen({ pedidos, showToast, onAbrirPedido, actualizarP
   })
   const vendidos = Object.entries(vend).sort((a, b) => b[1] - a[1])
   const maxVend = Math.max(1, ...vendidos.map((v) => v[1]))
-
-  async function enviarReporte() {
-    setEnviando(true)
-    try {
-      const { data: { session: s } } = await supabase.auth.getSession()
-      const resp = await fetch('/api/reporte-mensual', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.access_token}` },
-        body: JSON.stringify({ mes: sel % 12, anio: anioDe(sel) }),
-      })
-      const data = await resp.json()
-      if (!resp.ok) throw new Error(data.error || 'Error al generar el reporte')
-      showToast?.('📧', `Reporte de ${nombreMes(sel)} enviado a tu correo`)
-    } catch (err) {
-      showToast?.('⚠️', 'No se pudo enviar: ' + err.message)
-    } finally {
-      setEnviando(false)
-    }
-  }
 
   const mm = nombreMes(sel).toLowerCase()
 
@@ -353,13 +329,6 @@ export default function Resumen({ pedidos, showToast, onAbrirPedido, actualizarP
           </div>
         </div>
       </div>
-
-      {REPORTE_MENSUAL_ACTIVO && (
-        <div className="rs-panel rs-reporte">
-          <div className="txt"><b>Reporte de entregados en Excel.</b> Llega solo a tu correo el día 1 de cada mes. También puedes pedir ahora el de {nombreMes(sel).toLowerCase()} {anioDe(sel)}.</div>
-          <button className="btn btn-p" onClick={enviarReporte} disabled={enviando}>{enviando ? 'Enviando…' : 'Enviar a mi correo'}</button>
-        </div>
-      )}
     </div>
   )
 }

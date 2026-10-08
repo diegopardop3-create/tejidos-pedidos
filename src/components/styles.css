@@ -505,9 +505,6 @@ tbody td { padding: 10px 13px; vertical-align: middle; }
 .rs-tag.ok { background: #e2ebd8; color: var(--ctx); }
 .rs-barra { height: 6px; background: #ebe8dc; border-radius: 3px; overflow: hidden; min-width: 60px; }
 .rs-barra i { display: block; height: 100%; }
-.rs-reporte { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 16px 18px; }
-.rs-reporte .txt { flex: 1; min-width: 220px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
-.rs-reporte .txt b { color: var(--ink); }
 @media (max-width: 900px) {
   .rs-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .rs-rejilla { grid-template-columns: minmax(0, 1fr); }
