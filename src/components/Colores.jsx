@@ -55,6 +55,14 @@ function siguienteCodigo(conos, nombre) {
   return `${letra}-${String(max + 1).padStart(3, '0')}`
 }
 
+// Código del hilo del cono tal como lo trae el proveedor: marca + color
+// (ej. "mH · Col 114"). Los dos campos son opcionales.
+function hiloTexto(c) {
+  const marca = (c?.hilo_marca || '').trim()
+  const col = (c?.hilo_col || '').trim()
+  return [marca, col && `Col ${col}`].filter(Boolean).join(' · ')
+}
+
 function Muestra({ nombre, grande }) {
   const seg = segmentosColor(nombre)
   return (
@@ -147,7 +155,7 @@ export default function Colores({ pedidos, showToast, onAbrirPedido }) {
   const q = normalizar(busqueda)
   const visibles = colores.filter((c) =>
     (!filtro || c.cono?.estado === filtro) &&
-    (!q || normalizar(`${c.nombre} ${c.cono?.codigo || ''} ${c.pedidos.map((p) => p.numero).join(' ')}`).includes(q)))
+    (!q || normalizar(`${c.nombre} ${c.cono?.codigo || ''} ${c.cono?.hilo_marca || ''} ${c.cono?.hilo_col || ''} ${c.pedidos.map((p) => p.numero).join(' ')}`).includes(q)))
   const grupos = []
   for (const c of visibles) {
     if (!grupos.length || grupos[grupos.length - 1].gama !== c.gama) grupos.push({ gama: c.gama, items: [] })
@@ -164,11 +172,15 @@ export default function Colores({ pedidos, showToast, onAbrirPedido }) {
   }
 
   // ---- Conos ----
-  async function crearCono(nombre, estado = 'rotacion', nota = '') {
+  async function crearCono(nombre, estado = 'rotacion', nota = '', hiloMarca = '', hiloCol = '') {
     if (!nombre.trim()) { showToast('⚠️', 'Escribe el nombre del color'); return false }
     setGuardando(true)
     const codigo = siguienteCodigo(conos, nombre)
-    const { data, error } = await supabase.from('conos').insert({ codigo, nombre: nombre.trim(), estado, nota: nota.trim() || null }).select().single()
+    const fila = { codigo, nombre: nombre.trim(), estado, nota: nota.trim() || null }
+    // Solo se envían si se escribieron, para no fallar si la base aún no tiene esas columnas.
+    if (hiloMarca.trim()) fila.hilo_marca = hiloMarca.trim()
+    if (hiloCol.trim()) fila.hilo_col = hiloCol.trim()
+    const { data, error } = await supabase.from('conos').insert(fila).select().single()
     setGuardando(false)
     if (error) { showToast('⚠️', 'No se pudo guardar el color'); return false }
     setConos((prev) => [...prev, data])
@@ -194,6 +206,10 @@ export default function Colores({ pedidos, showToast, onAbrirPedido }) {
     if (!editCono.nombre.trim()) { showToast('⚠️', 'El nombre no puede quedar vacío'); return }
     setGuardando(true)
     const cambios = { nombre: editCono.nombre.trim(), nota: editCono.nota.trim() || null, actualizado_en: new Date().toISOString() }
+    if ('hilo_marca' in cono) {
+      cambios.hilo_marca = editCono.hilo_marca.trim() || null
+      cambios.hilo_col = editCono.hilo_col.trim() || null
+    }
     const { error } = await supabase.from('conos').update(cambios).eq('id', cono.id)
     setGuardando(false)
     if (error) { showToast('⚠️', 'No se pudieron guardar los cambios'); return }
@@ -267,7 +283,7 @@ export default function Colores({ pedidos, showToast, onAbrirPedido }) {
           <h1>Colores</h1>
           <p>Carta de conos, fórmulas y pedidos en un solo lugar.</p>
         </div>
-        <button className="btn btn-p pr-nuevo" onClick={() => setNuevo(nuevo ? null : { nombre: '', estado: 'rotacion', nota: '' })}>{Ico.mas}Nuevo color</button>
+        <button className="btn btn-p pr-nuevo" onClick={() => setNuevo(nuevo ? null : { nombre: '', estado: 'rotacion', nota: '', hiloMarca: '', hiloCol: '' })}>{Ico.mas}Nuevo color</button>
       </div>
 
       {nuevo && (
@@ -285,9 +301,11 @@ export default function Colores({ pedidos, showToast, onAbrirPedido }) {
               </select>
             </div>
             <div className="fld"><label>Nota (opcional)</label><input value={nuevo.nota} onChange={(e) => setNuevo({ ...nuevo, nota: e.target.value })} placeholder="Ej: proveedor X, brillante…" /></div>
+            <div className="fld"><label>Hilo: marca (opcional)</label><input value={nuevo.hiloMarca} onChange={(e) => setNuevo({ ...nuevo, hiloMarca: e.target.value })} placeholder="Ej: mH" /></div>
+            <div className="fld"><label>Hilo: color / referencia (opcional)</label><input value={nuevo.hiloCol} onChange={(e) => setNuevo({ ...nuevo, hiloCol: e.target.value })} placeholder="Ej: 114" /></div>
             <div className="co-nuevo-acc">
               <button className="btn btn-s" onClick={() => setNuevo(null)}>Cancelar</button>
-              <button className="btn btn-p" disabled={guardando} onClick={async () => { if (await crearCono(nuevo.nombre, nuevo.estado, nuevo.nota)) setNuevo(null) }}>{guardando ? 'Guardando…' : 'Agregar color'}</button>
+              <button className="btn btn-p" disabled={guardando} onClick={async () => { if (await crearCono(nuevo.nombre, nuevo.estado, nuevo.nota, nuevo.hiloMarca, nuevo.hiloCol)) setNuevo(null) }}>{guardando ? 'Guardando…' : 'Agregar color'}</button>
             </div>
           </div>
         </div>
@@ -296,7 +314,7 @@ export default function Colores({ pedidos, showToast, onAbrirPedido }) {
       <div className="lp-filtros">
         <label className="lp-buscar">
           {Ico.buscar}
-          <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Busca un color, código o número de pedido" />
+          <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Busca un color, código, hilo o número de pedido" />
         </label>
         <div className="co-chips">
           <button className={`tchip ${!filtro ? 'on' : ''}`} onClick={() => setFiltro('')}>Todos <span>{colores.length}</span></button>
@@ -337,12 +355,12 @@ export default function Colores({ pedidos, showToast, onAbrirPedido }) {
                 <Muestra nombre={elegido.nombre} grande />
                 <div className="co-titulo">
                   <h2>{elegido.nombre}</h2>
-                  <div>{elegido.cono ? <><b className="co-cod">{elegido.cono.codigo}</b> · </> : null}gama {elegido.gama}{elegido.cono?.nota ? ` · ${elegido.cono.nota}` : ''}</div>
+                  <div>{elegido.cono ? <><b className="co-cod">{elegido.cono.codigo}</b> · </> : null}gama {elegido.gama}{hiloTexto(elegido.cono) ? ` · hilo ${hiloTexto(elegido.cono)}` : ''}{elegido.cono?.nota ? ` · ${elegido.cono.nota}` : ''}</div>
                 </div>
                 {elegido.cono && (
                   <div className="lp-acc">
                     <button className="lp-ico" title="Imprimir etiqueta del cono" aria-label="Imprimir etiqueta del cono" onClick={() => imprimirEtiquetaCono(elegido.cono)}>{Ico.etiqueta}</button>
-                    <button className="lp-ico" title="Editar nombre y nota" aria-label="Editar color" onClick={() => setEditCono(editCono ? null : { nombre: elegido.cono.nombre, nota: elegido.cono.nota || '' })}>{Ico.editar}</button>
+                    <button className="lp-ico" title="Editar nombre, nota e hilo" aria-label="Editar color" onClick={() => setEditCono(editCono ? null : { nombre: elegido.cono.nombre, nota: elegido.cono.nota || '', hilo_marca: elegido.cono.hilo_marca || '', hilo_col: elegido.cono.hilo_col || '' })}>{Ico.editar}</button>
                   </div>
                 )}
               </div>
@@ -351,6 +369,12 @@ export default function Colores({ pedidos, showToast, onAbrirPedido }) {
                 <div className="co-bloque co-edit">
                   <div className="fld"><label>Nombre</label><input value={editCono.nombre} onChange={(e) => setEditCono({ ...editCono, nombre: e.target.value })} /></div>
                   <div className="fld"><label>Nota</label><input value={editCono.nota} onChange={(e) => setEditCono({ ...editCono, nota: e.target.value })} /></div>
+                  {'hilo_marca' in elegido.cono && (
+                    <>
+                      <div className="fld"><label>Hilo: marca</label><input value={editCono.hilo_marca} onChange={(e) => setEditCono({ ...editCono, hilo_marca: e.target.value })} placeholder="Ej: mH" /></div>
+                      <div className="fld"><label>Hilo: color / referencia</label><input value={editCono.hilo_col} onChange={(e) => setEditCono({ ...editCono, hilo_col: e.target.value })} placeholder="Ej: 114" /></div>
+                    </>
+                  )}
                   <div className="co-facc">
                     <button className="btn btn-d btn-sm co-izq" onClick={() => borrarCono(elegido.cono)}>Quitar de la carta</button>
                     <button className="btn btn-s btn-sm" onClick={() => setEditCono(null)}>Cancelar</button>

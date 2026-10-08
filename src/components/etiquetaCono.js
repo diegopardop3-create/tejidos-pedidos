@@ -5,6 +5,8 @@
 export function imprimirEtiquetaCono(cono) {
   const estadoTxt = cono.estado === 'sin_rotacion' ? 'SIN ROTACIÓN'
     : cono.estado === 'agotado' ? 'AGOTADO' : ''
+  const hilo = [(cono.hilo_marca || '').trim(), (cono.hilo_col || '').trim() && `Col ${(cono.hilo_col || '').trim()}`].filter(Boolean).join(' · ')
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
   const w = window.open('', '_blank', 'width=420,height=320')
   if (!w) return
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Etiqueta ${cono.codigo}</title>
@@ -23,6 +25,7 @@ export function imprimirEtiquetaCono(cono) {
     }
     .codigo { font-size: 30pt; font-weight: 900; color: #000; letter-spacing: 0.02em; line-height: 1; }
     .nombre { font-size: 8pt; font-weight: 700; color: #222; margin-top: 1mm; text-align: center; max-width: 47mm; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .hilo { font-size: 7pt; font-weight: 600; color: #444; margin-top: 0.3mm; }
     .estado { font-size: 6pt; font-weight: 700; color: #b23; margin-top: 0.5mm; letter-spacing: 0.08em; }
     .controls { text-align: center; margin-top: 4mm; }
     .controls button { background: #2d6a4f; color: #fff; border: none; padding: 9px 22px; border-radius: 8px; font-size: 14px; cursor: pointer; }
@@ -31,7 +34,8 @@ export function imprimirEtiquetaCono(cono) {
   </style></head><body>
     <div class="etq">
       <div class="codigo">${cono.codigo}</div>
-      <div class="nombre">${(cono.nombre || '').toUpperCase()}</div>
+      <div class="nombre">${esc((cono.nombre || '').toUpperCase())}</div>
+      ${hilo ? `<div class="hilo">${esc(hilo)}</div>` : ''}
       ${estadoTxt ? `<div class="estado">${estadoTxt}</div>` : ''}
     </div>
     <div class="controls">
