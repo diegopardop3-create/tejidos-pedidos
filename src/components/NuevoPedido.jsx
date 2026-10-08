@@ -57,15 +57,53 @@ function splitColorNombre(nombre) {
   return { principal: partes[0], rayas: partes.slice(1) }
 }
 
-// Guarda un borrador del pedido que se está armando (todo menos las fotos,
-// que pesan demasiado para el espacio de guardado del navegador). Así, si
-// el navegador se cierra o se cuelga antes de darle "Guardar Pedido", al
-// volver a abrir la app se puede ofrecer recuperarlo.
+// Guarda un borrador del pedido que se está armando: los datos en
+// localStorage y las fotos aparte, en IndexedDB (pesan demasiado para
+// localStorage). Así, si el navegador se cierra o se cuelga antes de darle
+// "Guardar Pedido", al volver a abrir la app se puede ofrecer recuperarlo.
 const BORRADOR_KEY = 'tejidos_borrador_pedido'
+function borrarBorrador() {
+  try { localStorage.removeItem(BORRADOR_KEY) } catch { /* sin acceso al almacenamiento: nada que borrar */ }
+  borrarFotosBorrador()
+}
 
 function sinImagenes(items) {
   return (items || []).map((it) => ({ ...it, imagenes: [] }))
 }
+
+// Las fotos del borrador van aparte, en IndexedDB: ahí caben decenas de MB,
+// mientras que localStorage se llena con unas pocas fotos. Todo es "mejor
+// esfuerzo": si el navegador no lo permite, el borrador sigue funcionando
+// sin fotos, como antes.
+const FOTOS_DB = 'tejidos_borrador_fotos'
+function abrirFotosDB() {
+  return new Promise((resolve, reject) => {
+    const r = indexedDB.open(FOTOS_DB, 1)
+    r.onupgradeneeded = () => r.result.createObjectStore('fotos')
+    r.onsuccess = () => resolve(r.result)
+    r.onerror = () => reject(r.error)
+  })
+}
+async function fotosBorradorOp(modo, fn) {
+  const db = await abrirFotosDB()
+  try {
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction('fotos', modo)
+      const out = fn(tx.objectStore('fotos'))
+      tx.oncomplete = () => resolve(out && 'result' in out ? out.result : undefined)
+      tx.onerror = () => reject(tx.error)
+      tx.onabort = () => reject(tx.error)
+    })
+  } finally { db.close() }
+}
+const guardarFotosBorrador = (cam, chaq) =>
+  fotosBorradorOp('readwrite', (st) => st.put({ cam, chaq }, 'actual')).catch(() => {})
+const borrarFotosBorrador = () =>
+  fotosBorradorOp('readwrite', (st) => st.delete('actual')).catch(() => {})
+const leerFotosBorrador = () =>
+  fotosBorradorOp('readonly', (st) => st.get('actual')).catch(() => undefined)
+const fotosDeItems = (items) => (items || []).map((it) => it.imagenes || [])
+const hayFotos = (f) => !!f && [...(f.cam || []), ...(f.chaq || [])].some((a) => a && a.length)
 
 export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit, showToast, userId }) {
   const [cliente, setCliente] = useState('')
@@ -74,6 +112,8 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
   const [obs, setObs] = useState('')
   const [numPedido, setNumPedido] = useState('')
   const [borradorDetectado, setBorradorDetectado] = useState(null)
+  const fotosBorradorRef = useRef(null) // promesa con las fotos del borrador previo
+  const borradorPendienteRef = useRef(false) // hay un borrador previo sin decidir
   const [sugerenciasAbiertas, setSugerenciasAbiertas] = useState(false)
   const cajaClienteRef = useRef(null)
 
@@ -134,7 +174,11 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
       if (!guardado) return
       const b = JSON.parse(guardado)
       const hayAlgo = (b.cliente || '').trim() || (b.obs || '').trim() || (b.tempCam || []).length || (b.tempChaq || []).length
-      if (hayAlgo) setBorradorDetectado(b)
+      if (hayAlgo) {
+        setBorradorDetectado(b)
+        borradorPendienteRef.current = true
+        fotosBorradorRef.current = leerFotosBorrador()
+      }
     } catch { /* borrador corrupto o ilegible: se ignora, no rompe la pantalla */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -146,7 +190,9 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
   useEffect(() => {
     if (editPedido) return
     const hayAlgo = cliente.trim() || obs.trim() || tempCam.length || tempChaq.length
-    if (!hayAlgo) { localStorage.removeItem(BORRADOR_KEY); return }
+    // Mientras haya un borrador anterior esperando decisión, no se borra
+    // nada: así no se pierde lo que el usuario aún puede recuperar.
+    if (!hayAlgo) { if (!borradorPendienteRef.current) borrarBorrador(); return }
     try {
       localStorage.setItem(BORRADOR_KEY, JSON.stringify({
         cliente, fecha, estado, obs,
@@ -155,20 +201,45 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
     } catch { /* si el espacio del navegador está lleno, seguimos sin borrador esta vez */ }
   }, [editPedido, cliente, fecha, estado, obs, tempCam, tempChaq])
 
-  function recuperarBorrador() {
+  // Fotos del borrador: se guardan un instante después del último cambio
+  // para no reescribirlas con cada letra que se teclea.
+  useEffect(() => {
+    if (editPedido) return
+    if (!tempCam.length && !tempChaq.length) return
+    const t = window.setTimeout(() => guardarFotosBorrador(fotosDeItems(tempCam), fotosDeItems(tempChaq)), 400)
+    return () => window.clearTimeout(t)
+  }, [editPedido, tempCam, tempChaq])
+
+  // Si cierras o recargas la página con un pedido a medias, el navegador
+  // pregunta antes de salir.
+  const hayPedidoSinGuardar = !editPedido && !!(cliente.trim() || obs.trim() || tempCam.length || tempChaq.length)
+  useEffect(() => {
+    if (!hayPedidoSinGuardar) return
+    const aviso = (e) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', aviso)
+    return () => window.removeEventListener('beforeunload', aviso)
+  }, [hayPedidoSinGuardar])
+
+  async function recuperarBorrador() {
     if (!borradorDetectado) return
+    const fotos = await Promise.resolve(fotosBorradorRef.current).catch(() => undefined)
+    const conFotos = (items, arr) => (items || []).map((it, i) => ({ ...it, imagenes: (arr && arr[i]) || [] }))
     setCliente(borradorDetectado.cliente || '')
     if (borradorDetectado.fecha) setFecha(borradorDetectado.fecha)
     if (borradorDetectado.estado) setEstado(borradorDetectado.estado)
     setObs(borradorDetectado.obs || '')
-    setTempCam(borradorDetectado.tempCam || [])
-    setTempChaq(borradorDetectado.tempChaq || [])
+    setTempCam(conFotos(borradorDetectado.tempCam, fotos?.cam))
+    setTempChaq(conFotos(borradorDetectado.tempChaq, fotos?.chaq))
+    borradorPendienteRef.current = false
+    fotosBorradorRef.current = null
     setBorradorDetectado(null)
-    showToast('📋', 'Borrador recuperado — las fotos no se guardan en el borrador, revisa si hace falta volver a agregarlas')
+    showToast('📋', hayFotos(fotos) ? 'Borrador recuperado con sus fotos' : 'Borrador recuperado — esta vez no quedaron fotos guardadas, revisa si hace falta volver a agregarlas')
   }
 
   function descartarBorrador() {
-    localStorage.removeItem(BORRADOR_KEY)
+    borradorPendienteRef.current = false
+    fotosBorradorRef.current = null
+    borrarBorrador()
     setBorradorDetectado(null)
   }
 
@@ -189,7 +260,8 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
     setCliente(''); setFecha(hoy()); setEstado('Pendiente'); setObs('')
     setTempCam([]); setTempChaq([])
     resetItemForms()
-    localStorage.removeItem(BORRADOR_KEY)
+    borradorPendienteRef.current = false
+    borrarBorrador()
     if (editPedido) onCancelEdit()
   }
 
@@ -531,7 +603,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
             <strong>📋 Tienes un borrador sin terminar</strong>
             <div style={{ fontSize: 12, color: 'var(--jtx)', marginTop: 3 }}>
               {borradorDetectado.cliente ? `Cliente: ${borradorDetectado.cliente} · ` : ''}
-              {(borradorDetectado.tempCam?.length || 0) + (borradorDetectado.tempChaq?.length || 0)} ítem(s) añadido(s) — las fotos no quedaron en el borrador.
+              {(borradorDetectado.tempCam?.length || 0) + (borradorDetectado.tempChaq?.length || 0)} ítem(s) añadido(s).
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
