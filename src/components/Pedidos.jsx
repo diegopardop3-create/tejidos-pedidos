@@ -6,15 +6,17 @@ import Entregados from './Entregados'
 import Resumen from './Resumen'
 import ListaPrecios from './ListaPrecios'
 import Colores from './Colores'
+import Disenos from './Disenos'
 import DetalleModal from './DetalleModal'
 import ConfirmarEliminar from './ConfirmarEliminar'
 import { cambiarConTransicion, useIndicador } from './Movimiento'
+import { olvidarFotos } from './fotosDisenos'
 import logo from '../assets/logo.png'
 import './styles.css'
 
 // Orden de las pestañas, de izquierda a derecha: decide hacia qué lado se
 // desliza el contenido al cambiar.
-const ORDEN_PESTANAS = ['nuevo', 'lista', 'entregados', 'resumen', 'precios', 'colores']
+const ORDEN_PESTANAS = ['nuevo', 'lista', 'entregados', 'disenos', 'resumen', 'precios', 'colores']
 
 export default function Pedidos({ session }) {
   const [tab, setTab] = useState('nuevo')
@@ -160,6 +162,8 @@ export default function Pedidos({ session }) {
   }
 
   async function handleLogout() {
+    // Las fotos que la galería guardó en este dispositivo no se quedan.
+    olvidarFotos()
     await supabase.auth.signOut()
   }
 
@@ -178,6 +182,7 @@ export default function Pedidos({ session }) {
     ['nuevo', <><span className="hnav-mas">+</span>Nuevo pedido</>],
     ['lista', <>Activos {!loading && <span className="hnav-n">{nActivos}</span>}</>],
     ['entregados', <>Entregados {!loading && <span className="hnav-n">{nEntregados}</span>}</>],
+    ['disenos', 'Diseños'],
     ['resumen', 'Resumen'],
     ['precios', 'Precios'],
     ['colores', 'Colores'],
@@ -273,6 +278,14 @@ export default function Pedidos({ session }) {
             actualizarPedidoLocal={actualizarPedidoLocal}
             onEliminar={(pedido) => setPedidoAEliminar(pedido)}
             showToast={showToast}
+          />
+        )}
+
+        {tab === 'disenos' && (
+          <Disenos
+            pedidos={pedidos}
+            loading={loading}
+            onAbrirPedido={abrirPedidoPorId}
           />
         )}
 
