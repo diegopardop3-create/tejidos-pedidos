@@ -118,11 +118,16 @@ export function useIndicador(clave) {
   }, [clave])
 
   // Si cambia el tamaño (cargan las letras, aparece un número, se gira el
-  // celular), se acomoda sin animación.
+  // celular, sale o se va la barra de desplazamiento), se acomoda: de una si
+  // estaba quieto, o corrigiendo el rumbo si iba en camino.
   useEffect(() => {
     const cont = ref.current
     if (!cont || typeof ResizeObserver === 'undefined') return undefined
-    const ro = new ResizeObserver(() => colocarIndicador(cont, false))
+    const ro = new ResizeObserver(() => {
+      const ind = cont.querySelector(':scope > .indicador')
+      const enCamino = !!ind?.getAnimations?.().some((a) => a.playState === 'running')
+      colocarIndicador(cont, enCamino)
+    })
     ro.observe(cont)
     // El indicador mismo no: su ancho cambia mientras se desliza.
     for (const hijo of cont.children) if (!hijo.classList.contains('indicador')) ro.observe(hijo)

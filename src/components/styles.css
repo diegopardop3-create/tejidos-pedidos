@@ -46,7 +46,9 @@ body { font-family: 'Inter', sans-serif; background: var(--loom); color: var(--i
 @media (prefers-reduced-motion: reduce) { .recargar-btn svg, .recargar-btn.girando svg { transition: none; animation: none; } }
 .hnav { overflow-x: auto; scrollbar-width: none; }
 .hnav::-webkit-scrollbar { display: none; }
-.hnav-pista { position: relative; display: flex; gap: 2px; width: max-content; min-width: 100%; }
+/* Ancho = el de las pestañas, no el de la ventana: así la barra de
+   desplazamiento al aparecer o desaparecer no mueve el indicador. */
+.hnav-pista { position: relative; display: flex; gap: 2px; width: max-content; }
 .hnav button { background: none; border: 0; color: rgba(255,255,255,.66); padding: 10px 14px 12px; font-weight: 600; font-size: 13px; white-space: nowrap; border-bottom: 3px solid transparent; display: flex; align-items: center; gap: 7px; cursor: pointer; font-family: 'Inter', sans-serif; transition: color .2s ease, transform .12s ease; -webkit-tap-highlight-color: transparent; }
 .hnav button:hover { color: #fff; }
 .hnav button:active { transform: scale(.96); }
