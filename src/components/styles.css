@@ -20,7 +20,10 @@
 }
 
 body { font-family: 'Inter', sans-serif; background: var(--loom); color: var(--ink); }
-.app-root { min-height: 100vh; }
+/* overflow-x: clip: lo que entra deslizándose al cambiar de pestaña no
+   asoma por el borde ni hace aparecer una barra horizontal (y, a diferencia
+   de "hidden", no le quita a la barra de arriba lo de quedarse pegada). */
+.app-root { min-height: 100vh; overflow-x: clip; }
 
 /* HEADER: marca + pestañas en la misma barra azul */
 .hdr { background: var(--ink); color: #fff; position: sticky; top: 0; z-index: 100; }
