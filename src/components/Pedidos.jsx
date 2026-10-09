@@ -286,6 +286,7 @@ export default function Pedidos({ session }) {
             pedidos={pedidos}
             loading={loading}
             onAbrirPedido={abrirPedidoPorId}
+            showToast={showToast}
           />
         )}
 

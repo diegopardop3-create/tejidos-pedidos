@@ -4,6 +4,7 @@ import { TALLA_SIN_DIVIDIR, TALLAS_NINO, TALLAS_ADULTO, etqTalla, partesTalla, o
 import ColorSwatch from './ColorSwatch'
 import FormulaColorBoton from './FormulaColorBoton'
 import { InsigniaTipos, InsigniaJuego, IconoPrenda } from './Insignias'
+import ElegirDiseno from './ElegirDiseno'
 
 // Reduce una foto (archivo) a máx. 1200 px y la devuelve como texto base64
 // JPEG. Si algo falla (formato raro), devuelve la foto original sin tocar.
@@ -38,6 +39,15 @@ function comprimirFoto(archivo) {
 
 const TIPOS_CAM = ['puno', 'cuello']
 const TIPOS_CHAQ = ['pretina', 'cuello', 'puno']
+
+// Carpeta con una foto: el botón para escoger un diseño ya hecho.
+const IcoCarpeta = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    <circle cx="9.5" cy="12.5" r="1.5" />
+    <path d="m21 16-4.5-4.5L9 19" />
+  </svg>
+)
 
 // Un color puede tener un color principal y varias "rayas" en orden
 // (ej: Marfil con raya Negra, raya Roja, raya Azul). Esto arma el nombre
@@ -146,6 +156,8 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
   const [chaqEditIdx, setChaqEditIdx] = useState(null)
 
   const [saving, setSaving] = useState(false)
+  // "Mis diseños" abierto para el ítem de camiseta o de chaqueta.
+  const [eligiendo, setEligiendo] = useState(null) // null | 'cam' | 'chaq'
 
   // Calcular siguiente número de pedido
   useEffect(() => {
@@ -339,6 +351,15 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
       if (sec === 'cam') setCamImgs((p) => [...p, data])
       else setChaqImgs((p) => [...p, data])
     })
+  }
+
+  // Diseños escogidos de la carpeta: entran como cualquier foto del ítem.
+  function agregarDisenos(fotos, sec) {
+    const poner = (p) => [...p, ...fotos.filter((f) => !p.includes(f))]
+    if (sec === 'cam') setCamImgs(poner)
+    else setChaqImgs(poner)
+    setEligiendo(null)
+    showToast('🖼️', fotos.length === 1 ? 'Diseño agregado al ítem' : `${fotos.length} diseños agregados al ítem`)
   }
 
   function guardarItemCam() {
@@ -684,6 +705,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
               editando={camEditIdx !== null}
               punoSinDividir={camPunoSinDividir} setPunoSinDividir={setCamPunoSinDividir}
               onImgs={(e) => handleImgs(e, 'cam')}
+              onElegir={() => setEligiendo('cam')}
               onDelImg={(i) => setCamImgs((p) => p.filter((_, idx) => idx !== i))}
               onCancel={resetItemForms}
               onSave={guardarItemCam}
@@ -729,6 +751,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
               setV={chaqSetV} addRow={chaqAddRow} delRow={chaqDelRow}
               setRows={setChaqRows}
               onImgs={(e) => handleImgs(e, 'chaq')}
+              onElegir={() => setEligiendo('chaq')}
               onDelImg={(i) => setChaqImgs((p) => p.filter((_, idx) => idx !== i))}
               onCancel={resetItemForms}
               onSave={guardarItemChaq}
@@ -754,6 +777,16 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
           {saving ? 'Guardando…' : '💾 Guardar Pedido'}
         </button>
       </div>
+
+      {eligiendo && (
+        <ElegirDiseno
+          pedidos={pedidos}
+          actuales={eligiendo === 'cam' ? camImgs : chaqImgs}
+          onElegir={(fotos) => agregarDisenos(fotos, eligiendo)}
+          onCerrar={() => setEligiendo(null)}
+          showToast={showToast}
+        />
+      )}
     </div>
   )
 }
@@ -886,7 +919,7 @@ function ItemCardChaq({ it, onDelete, onEdit, showToast }) {
 // tallas × colores. Las tallas se eligen tocando botones; para unir dos o más
 // tallas seguidas (ej. M y L) se marcan en la tabla y se toca "Unir". Las
 // cantidades de las tallas unidas se suman en la nueva fila.
-function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, setPrecios, setV, setCants, addCol, delCol, setCols, onImgs, onDelImg, onCancel, onSave, esJuego, setEsJuego, filas, setFilas, editando, showToast, punoSinDividir, setPunoSinDividir }) {
+function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, setPrecios, setV, setCants, addCol, delCol, setCols, onImgs, onElegir, onDelImg, onCancel, onSave, esJuego, setEsJuego, filas, setFilas, editando, showToast, punoSinDividir, setPunoSinDividir }) {
   const puedeSerJuego = tipos.length === 2 && tipos.includes('puno') && tipos.includes('cuello')
   const juego = esJuego && puedeSerJuego
   const psd = punoSinDividir && tipos.includes('puno')
@@ -1082,6 +1115,9 @@ function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, s
             <input type="file" accept="image/*" multiple onChange={onImgs} />
             <span>+ Foto</span>
           </label>
+          <button type="button" className="ed-foto-add ed-foto-carpeta" onClick={onElegir} title="Escoger un diseño que ya hiciste">
+            <span>{IcoCarpeta}Diseños</span>
+          </button>
         </div>
       </div>
 
@@ -1232,7 +1268,7 @@ function FormularioCam({ tipos, cols, cants, diseno, precios, imgs, setDiseno, s
   )
 }
 
-function FormularioChaq({ tipos, rows, cants, diseno, precios, imgs, setDiseno, setPrecios, setV, addRow, delRow, setRows, onImgs, onDelImg, onCancel, onSave, showToast }) {
+function FormularioChaq({ tipos, rows, cants, diseno, precios, imgs, setDiseno, setPrecios, setV, addRow, delRow, setRows, onImgs, onElegir, onDelImg, onCancel, onSave, showToast }) {
   return (
     <div className="add-form">
       <div className="af-title">Nuevo ítem — <InsigniaTipos tipos={tipos} prenda="chaq" extra="chaqueta" /></div>
@@ -1254,6 +1290,7 @@ function FormularioChaq({ tipos, rows, cants, diseno, precios, imgs, setDiseno, 
             <input type="file" accept="image/*" multiple onChange={onImgs} />
             <div className="img-upload-label">📷 <strong>Toca para subir fotos</strong><br /><span style={{ fontSize: 11 }}>Puedes añadir varias imágenes</span></div>
           </div>
+          <button type="button" className="lp-btn ed-carpeta-btn" onClick={onElegir}>{IcoCarpeta}Elegir de mis diseños</button>
           <div className="img-previews">
             {imgs.map((src, i) => (
               <div className="img-thumb" key={i}>

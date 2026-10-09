@@ -2,16 +2,18 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { fmtFecha } from './constants'
 import { InsigniaTipos } from './Insignias'
-import { reintentar, useDiseno, useFotosGrandes } from './fotosDisenos'
+import { PESO_VECINO, PESO_VISOR, compartirFoto, reintentarErrores, useDiseno, useFotosGrandes } from './fotosDisenos'
+import { raizVentanas, useAtrasCierra, useBloquearFondo } from './capas'
 
 // ============================================
 // VISOR DE DISEÑOS
 // ============================================
 // La foto sale de su tarjeta y crece hasta llenar la pantalla; al cerrar
-// vuelve a su sitio. Se pasa a la siguiente foto (y al siguiente diseño)
-// deslizando de lado o con las flechas; deslizar hacia abajo cierra. Doble
-// toque o dos dedos amplían para ver el detalle del tejido. El botón "atrás"
-// del celular cierra el visor en vez de salir de la app.
+// vuelve a su sitio. Se pasa al siguiente diseño deslizando de lado o con las
+// flechas; deslizar hacia abajo cierra. Doble toque o dos dedos amplían para
+// ver el detalle del tejido. El botón "atrás" del celular cierra el visor en
+// vez de salir de la app. Abajo: los pedidos donde se usó el diseño y el
+// botón para mandar la foto por WhatsApp.
 
 const sinMovimiento = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 const CURVA = 'cubic-bezier(.2, 0, 0, 1)'
@@ -46,27 +48,34 @@ function traerAVista(el) {
 
 // Pide de antemano el diseño vecino, para que al pasar ya esté.
 function Precarga({ d }) {
-  useDiseno(d.id, d.tabla, true)
+  useDiseno(d.rep.id, d.rep.tabla, true, PESO_VECINO)
   return null
 }
 
-export default function VisorDisenos({ lista, inicio, onCerrar, onVerPedido }) {
-  const [pos, setPos] = useState({ di: inicio, fi: 0, dir: 0 })
+// lista: los diseños de la galería, al día (mientras se revisan las fotos
+// pueden aparecer más o juntarse dos). inicio: el diseño que se tocó.
+export default function VisorDisenos({ lista, inicio, onCerrar, onVerPedido, showToast }) {
+  const [pos, setPos] = useState({ key: inicio, dir: 0 })
   const [chrome, setChrome] = useState(true) // botones e información a la vista
-  const d = lista[pos.di]
-  const f = useDiseno(d.id, d.tabla, true, true)
+  const ultimaPos = useRef(0)
+  let di = lista.findIndex((x) => x.key === pos.key)
+  // Si se juntó con otro mientras se miraba, se sigue en el que lo contiene.
+  if (di < 0) di = lista.findIndex((x) => x.claves.includes(pos.key))
+  if (di < 0) di = Math.min(ultimaPos.current, lista.length - 1)
+  ultimaPos.current = di
+  const d = lista[di] || lista[0]
+  const idx = d.rep.idx
+  const f = useDiseno(d.rep.id, d.rep.tabla, true, PESO_VISOR)
   const listo = f.estado === 'listo'
-  const n = listo ? f.n : 0
-  // fi -1 = la última foto del diseño (al llegar desde el siguiente).
-  const fi = n ? (pos.fi < 0 ? n - 1 : Math.min(pos.fi, n - 1)) : 0
-  const clave = `${d.id}:${fi}`
-  const grandes = useFotosGrandes(d.id, listo)
+  const clave = d.key
+  const grandes = useFotosGrandes(d.rep.id, listo)
+  const blob = grandes?.blobs?.[idx] || null
 
   // La foto grande se muestra cuando ya está lista para pintarse; mientras
   // tanto se ve la pequeña (ya en memoria), así nunca queda en blanco.
   const [grande, setGrande] = useState({ clave: null, src: null, de: null })
   useEffect(() => {
-    const url = grandes?.[fi]
+    const url = grandes?.urls?.[idx]
     if (!url) return undefined
     let vivo = true
     const im = new Image()
@@ -75,13 +84,15 @@ export default function VisorDisenos({ lista, inicio, onCerrar, onVerPedido }) {
     if (im.decode) im.decode().then(mostrar, mostrar)
     else im.onload = mostrar
     return () => { vivo = false }
-  }, [grandes, fi, clave])
+  }, [grandes, idx, clave])
   // Solo si es de las fotos vigentes (al volver a un diseño se crean de nuevo).
-  const src = (grande.clave === clave && grande.de === grandes && grande.src) || f.minis[fi] || null
+  const src = (grande.clave === clave && grande.de === grandes && grande.src) || f.minis[idx] || null
 
   const [rotas, setRotas] = useState(() => new Set()) // fotos que el navegador no pudo abrir
-  const haySiguiente = fi + 1 < n || pos.di + 1 < lista.length
-  const hayAnterior = fi > 0 || pos.di > 0
+  const haySiguiente = di + 1 < lista.length
+  const hayAnterior = di > 0
+  const usos = d.usos
+  const u = d.ultimo
 
   const raizRef = useRef(null)
   const veloRef = useRef(null)
@@ -164,13 +175,9 @@ export default function VisorDisenos({ lista, inicio, onCerrar, onVerPedido }) {
   function ir(delta) {
     if (cerrando.current) return
     zoom.current = { s: 1, tx: 0, ty: 0 }
-    if (delta > 0) {
-      if (fi + 1 < n) setPos({ di: pos.di, fi: fi + 1, dir: 1 })
-      else if (pos.di + 1 < lista.length) setPos({ di: pos.di + 1, fi: 0, dir: 1 })
-      else rebotar(1)
-    } else if (fi > 0) setPos({ di: pos.di, fi: fi - 1, dir: -1 })
-    else if (pos.di > 0) setPos({ di: pos.di - 1, fi: -1, dir: -1 })
-    else rebotar(-1)
+    const otro = lista[di + delta]
+    if (!otro) { rebotar(delta); return }
+    setPos({ key: otro.key, dir: delta })
   }
 
   // La foto nueva entra desde el lado hacia donde se va.
@@ -179,7 +186,7 @@ export default function VisorDisenos({ lista, inicio, onCerrar, onVerPedido }) {
     if (primera.current || !pos.dir || !img) return
     animada.current = clave
     if (!sinMovimiento()) img.animate([{ transform: `translateX(${pos.dir * 48}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: CURVA })
-  }, [clave]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pos.key]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function alCargar(e) {
     const img = e.currentTarget
@@ -188,7 +195,7 @@ export default function VisorDisenos({ lista, inicio, onCerrar, onVerPedido }) {
       animada.current = clave
       img.classList.remove('esperando')
       if (sinMovimiento()) return
-      const T = marcoDe(d.id)?.getBoundingClientRect()
+      const T = marcoDe(d.key)?.getBoundingClientRect()
       const F = img.getBoundingClientRect()
       const aTiempo = performance.now() - abiertoEn.current < 800
       if (aTiempo && enPantalla(T) && F.width) {
@@ -206,7 +213,8 @@ export default function VisorDisenos({ lista, inicio, onCerrar, onVerPedido }) {
   }
 
   // ---------- Cerrar ----------
-  const soltarHistoria = () => { if (window.history.state?.llVisor) window.history.back() }
+  // El botón "atrás" del celular (o del navegador) cierra el visor.
+  const soltarHistoria = useAtrasCierra('llVisor', () => cerrarRef.current({ desdeHistoria: true }))
 
   function cerrar({ desdeHistoria = false } = {}) {
     if (cerrando.current) return
@@ -229,7 +237,7 @@ export default function VisorDisenos({ lista, inicio, onCerrar, onVerPedido }) {
       img.style.transform = 'none'
       const F = img.getBoundingClientRect()
       img.style.transform = antes
-      const marco = marcoDe(d.id)
+      const marco = marcoDe(d.key)
       if (marco) traerAVista(marco)
       const T = marco?.getBoundingClientRect()
       if (enPantalla(T) && F.width) {
@@ -243,12 +251,24 @@ export default function VisorDisenos({ lista, inicio, onCerrar, onVerPedido }) {
     else window.setTimeout(onCerrar, 240)
   }
 
-  function verPedido() {
+  function verPedido(pedidoId) {
     if (cerrando.current) return
     cerrando.current = true
     soltarHistoria()
     onCerrar()
-    onVerPedido?.(d.pedido.id)
+    onVerPedido?.(pedidoId)
+  }
+
+  // Manda la foto completa por WhatsApp (menú de compartir del celular). Si
+  // el navegador no puede compartir archivos, la descarga.
+  async function compartir() {
+    if (!blob) return
+    try {
+      const r = await compartirFoto(blob, `diseno-${String(u.pedido.numero || 'LyL').replace(/[^\w-]/g, '')}.jpg`)
+      if (r === 'descargada') showToast?.('⬇️', 'Foto descargada: adjúntala en WhatsApp')
+    } catch {
+      showToast?.('⚠️', 'No se pudo compartir la foto')
+    }
   }
 
   // Las funciones más nuevas, para los escuchas que se crean una sola vez.
@@ -398,31 +418,7 @@ export default function VisorDisenos({ lista, inicio, onCerrar, onVerPedido }) {
 
   // ---------- Al abrir y cerrar ----------
   // Mientras está abierto: la página de atrás no se mueve ni recibe el foco.
-  useLayoutEffect(() => {
-    const html = document.documentElement
-    const barra = window.innerWidth - html.clientWidth
-    const antes = { overflow: html.style.overflow, padding: html.style.paddingRight }
-    html.style.overflow = 'hidden'
-    if (barra > 0) html.style.paddingRight = `${barra}px`
-    const fondo = [...document.querySelectorAll('.app-root > .hdr, .app-root > .wrap')]
-    for (const el of fondo) el.inert = true
-    const foco = document.activeElement
-    cerrarBtnRef.current?.focus({ preventScroll: true })
-    return () => {
-      html.style.overflow = antes.overflow
-      html.style.paddingRight = antes.padding
-      for (const el of fondo) el.inert = false
-      if (foco && document.contains(foco)) foco.focus?.({ preventScroll: true })
-    }
-  }, [])
-
-  // El botón "atrás" del celular (o del navegador) cierra el visor.
-  useEffect(() => {
-    if (!window.history.state?.llVisor) window.history.pushState({ ...(window.history.state || {}), llVisor: true }, '')
-    const alVolver = () => cerrarRef.current({ desdeHistoria: true })
-    window.addEventListener('popstate', alVolver)
-    return () => window.removeEventListener('popstate', alVolver)
-  }, [])
+  useBloquearFondo(cerrarBtnRef)
 
   // Teclado: Esc cierra, flechas pasan. Rueda con Ctrl (o pellizco en el
   // panel táctil del computador) amplía.
@@ -458,14 +454,14 @@ export default function VisorDisenos({ lista, inicio, onCerrar, onVerPedido }) {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const siguiente = lista[pos.di + 1]
-  const anterior = lista[pos.di - 1]
+  const siguiente = lista[di + 1]
+  const anterior = lista[di - 1]
   const visor = (
     <div ref={raizRef} className={`dz-visor${chrome ? '' : ' sin-chrome'}`} role="dialog" aria-modal="true" aria-label="Fotos de los diseños">
       <div ref={veloRef} className="dz-velo" />
 
       <div className="dz-arriba dz-chrome">
-        <span className="dz-cont">{pos.di + 1} / {lista.length}</span>
+        <span className="dz-cont">{di + 1} / {lista.length}</span>
         <button ref={cerrarBtnRef} type="button" className="dz-btn" onClick={() => cerrar()} aria-label="Cerrar">{IcoCerrar}</button>
       </div>
 
@@ -483,7 +479,7 @@ export default function VisorDisenos({ lista, inicio, onCerrar, onVerPedido }) {
             ref={imgRef}
             className={`dz-foto${primera.current ? ' esperando' : ''}`}
             src={src}
-            alt={`Diseño de ${d.pedido.cliente}${n > 1 ? `, foto ${fi + 1} de ${n}` : ''}`}
+            alt={`Diseño de ${d.clientes.join(', ') || 'un pedido'}`}
             draggable={false}
             onLoad={alCargar}
             onError={() => { primera.current = false; setRotas((r) => new Set(r).add(src)) }}
@@ -493,43 +489,58 @@ export default function VisorDisenos({ lista, inicio, onCerrar, onVerPedido }) {
         ) : f.estado === 'error' ? (
           <div className="dz-estado">
             <p>No se pudo cargar la foto. Revisa la conexión.</p>
-            <button type="button" className="btn btn-s btn-sm" onClick={() => reintentar(d.id)}>Reintentar</button>
+            <button type="button" className="btn btn-s btn-sm" onClick={reintentarErrores}>Reintentar</button>
           </div>
         ) : listo ? (
-          <div className="dz-estado"><p>Este diseño no tiene fotos.</p></div>
+          <div className="dz-estado"><p>Esta foto ya no está en el pedido.</p></div>
         ) : (
           <div className="dz-gira" role="status" aria-label="Cargando la foto" />
         )}
       </div>
 
-      {hayAnterior && <button type="button" className="dz-btn dz-flecha izq dz-chrome" onClick={() => ir(-1)} aria-label="Foto anterior">{IcoIzq}</button>}
-      {haySiguiente && <button type="button" className="dz-btn dz-flecha der dz-chrome" onClick={() => ir(1)} aria-label="Foto siguiente">{IcoDer}</button>}
+      {hayAnterior && <button type="button" className="dz-btn dz-flecha izq dz-chrome" onClick={() => ir(-1)} aria-label="Diseño anterior">{IcoIzq}</button>}
+      {haySiguiente && <button type="button" className="dz-btn dz-flecha der dz-chrome" onClick={() => ir(1)} aria-label="Diseño siguiente">{IcoDer}</button>}
 
       <div className="dz-abajo dz-chrome">
-        {n > 1 && (
-          <div className="dz-puntos" aria-hidden="true">
-            {Array.from({ length: n }, (_, i) => <i key={i} className={i === fi ? 'on' : ''} />)}
-          </div>
-        )}
-        <div className="dz-info" key={d.id}>
+        <div className="dz-info" key={d.key}>
           <div className="dz-info-txt">
-            <div className="dz-info-1"><b>{d.pedido.cliente}</b><span className="dz-info-num">{d.pedido.numero}</span></div>
+            <div className="dz-info-1">
+              <b>{d.clientes.join(', ') || 'Sin cliente'}</b>
+              {usos.length === 1 && <span className="dz-info-num">{u.pedido.numero}</span>}
+            </div>
             <div className="dz-info-2">
-              <InsigniaTipos tipos={d.it.tipos} prenda={d.prenda} />
-              <span>{fmtFecha(d.pedido.fecha)}</span>
+              <InsigniaTipos tipos={u.it?.tipos} prenda={u.prenda} />
+              <span>{usos.length > 1 ? `Usado en ${usos.length} pedidos` : fmtFecha(u.pedido.fecha)}</span>
             </div>
             {d.ref && <p className="dz-info-ref">{d.ref}</p>}
+            {usos.length > 1 && (
+              <div className="dz-usos" role="list" aria-label="Pedidos con este diseño">
+                {usos.map((x) => (
+                  <button key={x.pedido.id} type="button" role="listitem" className="dz-uso" onClick={() => verPedido(x.pedido.id)} title={`Abrir el pedido ${x.pedido.numero}`}>
+                    <b>{x.pedido.numero}</b>
+                    <span>{d.clientes.length > 1 ? `${x.pedido.cliente} · ` : ''}{fmtFecha(x.pedido.fecha)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-          <button type="button" className="btn btn-p dz-ver" onClick={verPedido}>Ver pedido</button>
+          <div className="dz-info-acc">
+            <button type="button" className="btn dz-wa" onClick={compartir} disabled={!blob} title="Mandar la foto por WhatsApp">
+              {IcoEnviar}WhatsApp
+            </button>
+            {usos.length === 1 && <button type="button" className="btn btn-p dz-ver" onClick={() => verPedido(u.pedido.id)}>Ver pedido</button>}
+          </div>
         </div>
       </div>
 
-      {siguiente && <Precarga key={siguiente.id} d={siguiente} />}
-      {anterior && <Precarga key={anterior.id} d={anterior} />}
+      {siguiente && <Precarga key={siguiente.key} d={siguiente} />}
+      {anterior && <Precarga key={anterior.key} d={anterior} />}
     </div>
   )
-  return createPortal(visor, document.querySelector('.app-root') || document.body)
+  return createPortal(visor, raizVentanas())
 }
+
+const IcoEnviar = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 2 11 13" /><path d="M22 2 15 22l-4-9-9-4z" /></svg>
 
 const IcoCerrar = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
 const IcoIzq = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>

@@ -1,18 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { MESES, TIPO_LABEL } from './constants'
+import { useEffect, useRef, useState } from 'react'
+import { MESES } from './constants'
 import { normalizar } from './hilos'
 import { Ico } from './iconos'
 import { ConoHilo, useIndicador } from './Movimiento'
-import { consultarIdsConFotos, idsConFotosConocidos, podarGuardados, reintentar, useDiseno, useEnPantalla } from './fotosDisenos'
+import { reintentarErrores, useCarpeta, useEnPantalla } from './fotosDisenos'
+import MarcoDiseno from './MarcoDiseno'
 import VisorDisenos from './VisorDisenos'
 
 // ============================================
 // DISEÑOS
 // ============================================
-// Todas las fotos de los pedidos en un solo lugar, del más reciente al más
-// antiguo y agrupadas por mes. Cada tarjeta es un diseño (un ítem de un
-// pedido); al tocarla se abre en grande con todas sus fotos, y desde ahí se
-// puede pasar al siguiente o abrir el pedido. Aquí no se repiten precios ni
+// La carpeta con las fotos de todos los pedidos. Cada diseño aparece una sola
+// vez aunque la misma foto se haya subido en varios pedidos, y dice en
+// cuáles se usó. Van del más usado recientemente al más viejo, por mes. Al
+// tocar uno se abre en grande; desde ahí se pasa al siguiente, se abre un
+// pedido o se manda la foto por WhatsApp. Aquí no se repiten precios ni
 // cantidades: eso sigue estando solo en el pedido.
 
 const PRENDAS = [['', 'Todos'], ['cam', 'Camiseta'], ['chaq', 'Chaqueta']]
@@ -22,77 +24,52 @@ function nombreMes(k) {
   const [y, m] = k.split('-').map(Number)
   return `${MESES[m - 1]} ${y}`
 }
-const porCreacion = (a, b) => String(a.creado_en || '').localeCompare(String(b.creado_en || ''))
 
-export default function Disenos({ pedidos, loading, onAbrirPedido }) {
-  // undefined = todavía no se sabe; null = no se pudo saber (se revisa cada
-  // ítem); Set = los id de los ítems que tienen fotos.
-  const [conFotos, setConFotos] = useState(() => idsConFotosConocidos() || undefined)
+// true cuando la condición lleva un rato cumpliéndose (para no hacer
+// parpadear avisos que duran un instante).
+function useTras(cond, ms) {
+  const [si, setSi] = useState(false)
+  useEffect(() => {
+    if (!cond) { setSi(false); return undefined }
+    const t = window.setTimeout(() => setSi(true), ms)
+    return () => window.clearTimeout(t)
+  }, [cond, ms])
+  return cond && si
+}
+
+export default function Disenos({ pedidos, loading, onAbrirPedido, showToast }) {
+  const car = useCarpeta(pedidos)
   const [busqueda, setBusqueda] = useState('')
   const [prenda, setPrenda] = useState('')
-  const [visor, setVisor] = useState(null) // { lista, di }
+  const [visor, setVisor] = useState(null) // key del diseño abierto en grande
   const segRef = useIndicador(prenda)
 
-  useEffect(() => {
-    let vivo = true
-    let t = 0
-    consultarIdsConFotos().then((ids) => {
-      if (!vivo) return
-      if (ids) {
-        setConFotos(ids)
-        // Limpia lo guardado de diseños que ya no existen, sin apuro.
-        t = window.setTimeout(() => podarGuardados(ids), 4000)
-      } else {
-        setConFotos((v) => (v === undefined ? null : v))
-      }
-    })
-    return () => { vivo = false; window.clearTimeout(t) }
-  }, [])
-
-  const disenos = useMemo(() => {
-    if (conFotos === undefined) return []
-    const out = []
-    for (const p of pedidos) {
-      const poner = (items, tabla, pr) => {
-        for (const it of [...(items || [])].sort(porCreacion)) {
-          if (conFotos && !conFotos.has(String(it.id))) continue
-          const tipos = (it.tipos || []).map((t) => TIPO_LABEL[t] || t).join(' · ')
-          const ref = String(it.diseno || '').trim()
-          out.push({
-            id: String(it.id), tabla, prenda: pr, pedido: p, it, tipos, ref,
-            busca: normalizar([p.cliente, p.numero, ref, tipos, pr === 'cam' ? 'camiseta' : 'chaqueta', ...(it.colores || [])].join(' ')),
-          })
-        }
-      }
-      poner(p.items_camiseta, 'items_camiseta', 'cam')
-      poner(p.items_chaqueta, 'items_chaqueta', 'chaq')
-    }
-    // Lo más reciente primero; dentro de un pedido, en el orden en que se
-    // agregaron los ítems (el orden se conserva al ordenar).
-    return out.sort((a, b) => String(b.pedido.fecha || '').localeCompare(String(a.pedido.fecha || ''))
-      || String(b.pedido.numero || '').localeCompare(String(a.pedido.numero || ''), 'es', { numeric: true }))
-  }, [pedidos, conFotos])
-
   const partes = normalizar(busqueda).split(/\s+/).filter(Boolean)
-  const coinciden = partes.length ? disenos.filter((d) => partes.every((p) => d.busca.includes(p))) : disenos
+  const coinciden = partes.length ? car.disenos.filter((d) => partes.every((p) => d.busca.includes(p))) : car.disenos
   const cuenta = { '': coinciden.length, cam: 0, chaq: 0 }
-  for (const d of coinciden) cuenta[d.prenda]++
-  const visibles = prenda ? coinciden.filter((d) => d.prenda === prenda) : coinciden
-  const grupos = []
+  for (const d of coinciden) for (const p of d.prendas) cuenta[p]++
+  const visibles = prenda ? coinciden.filter((d) => d.prendas.has(prenda)) : coinciden
+  const meses = []
   for (const d of visibles) {
-    const k = claveMes(d.pedido.fecha)
-    if (!grupos.length || grupos[grupos.length - 1].k !== k) grupos.push({ k, items: [] })
-    grupos[grupos.length - 1].items.push(d)
+    const k = claveMes(d.ultimo.pedido.fecha)
+    if (!meses.length || meses[meses.length - 1].k !== k) meses.push({ k, items: [] })
+    meses[meses.length - 1].items.push(d)
   }
 
-  const cargando = loading || conFotos === undefined
+  const faltan = car.total - car.listos - car.errores // ítems todavía por revisar
+  const repetidas = car.fotos - car.disenos.length
+  const cargando = loading || car.cargando || (!car.disenos.length && faltan > 0)
+  const mostrarAvance = useTras(faltan > 0 && !cargando, 700)
 
   return (
     <div className="dz">
       <div className="lp-cab">
         <div>
           <h1>Diseños</h1>
-          <p>Las fotos de todos los pedidos, del más reciente al más antiguo.</p>
+          <p>
+            Cada diseño aparece una sola vez, con los pedidos donde se usó.
+            {!faltan && repetidas > 0 && <span className="dz-juntadas"> {repetidas} {repetidas === 1 ? 'foto repetida juntada' : 'fotos repetidas juntadas'}.</span>}
+          </p>
         </div>
         <div className="lp-seg con-pildora dz-prendas" role="group" aria-label="Prenda" ref={segRef}>
           <span className="indicador seg-pildora" aria-hidden="true" />
@@ -111,74 +88,79 @@ export default function Disenos({ pedidos, loading, onAbrirPedido }) {
         </label>
       </div>
 
+      {mostrarAvance && (
+        <div className="dz-avance" role="status">
+          <span>Revisando fotos repetidas… {car.listos} de {car.total}</span>
+          <i><b style={{ width: `${Math.round((car.listos / Math.max(1, car.total)) * 100)}%` }} /></i>
+        </div>
+      )}
+      {!faltan && car.errores > 0 && (
+        <div className="dz-aviso" role="status">
+          No se pudieron revisar {car.errores === 1 ? '1 pedido' : `${car.errores} pedidos`}: revisa la conexión.
+          <button type="button" className="btn btn-s btn-sm" onClick={reintentarErrores}>Reintentar</button>
+        </div>
+      )}
+
       {cargando ? (
         <div className="empty"><ConoHilo /><p>Buscando las fotos…</p></div>
       ) : !visibles.length ? (
         <div className="empty">
           <ConoHilo girando={false} />
-          <p>{disenos.length ? 'Ningún diseño coincide con la búsqueda' : 'Todavía no hay fotos en los pedidos'}</p>
+          <p>{car.disenos.length ? 'Ningún diseño coincide con la búsqueda' : 'Todavía no hay fotos en los pedidos'}</p>
         </div>
-      ) : grupos.map((g) => (
-        <section key={g.k} className="dz-grupo">
-          <h2 className="dz-mes"><span>{nombreMes(g.k)}</span><span className="dz-mes-n">{g.items.length}</span></h2>
+      ) : meses.map((m) => (
+        <section key={m.k} className="dz-grupo">
+          <h2 className="dz-mes"><span>{nombreMes(m.k)}</span><span className="dz-mes-n">{m.items.length}</span></h2>
           <div className="dz-rejilla">
-            {g.items.map((d) => (
-              <Tarjeta key={d.id} d={d} revisar={conFotos === null} onAbrir={() => setVisor({ lista: visibles, di: visibles.indexOf(d) })} />
+            {m.items.map((d) => (
+              <Tarjeta key={d.key} d={d} onAbrir={() => setVisor(d.key)} />
             ))}
           </div>
         </section>
       ))}
 
-      {visor && (
+      {visor && visibles.length > 0 && (
         <VisorDisenos
-          lista={visor.lista}
-          inicio={visor.di}
+          lista={visibles}
+          inicio={visor}
           onCerrar={() => setVisor(null)}
           onVerPedido={onAbrirPedido}
+          showToast={showToast}
         />
       )}
     </div>
   )
 }
 
-// Un diseño en la cuadrícula: su primera foto, el cliente y el pedido.
-// Pide sus fotos solo cuando está en pantalla o a punto de aparecer.
-function Tarjeta({ d, revisar, onAbrir }) {
+// Un diseño en la cuadrícula: su foto, el cliente y el último pedido donde se
+// usó; si se usó en varios, cuántos.
+function Tarjeta({ d, onAbrir }) {
   const ref = useRef(null)
   const visto = useEnPantalla(ref)
-  const f = useDiseno(d.id, d.tabla, visto)
-  const [img, setImg] = useState('') // '' cargando | 'lista' | 'rota'
-  const mini = f.minis[0]
-  const vacia = f.estado === 'listo' && !f.n
-
-  // Sin la lista de ítems con fotos, los que resultan no tener se esconden.
-  if (revisar && vacia) return null
-
-  const error = f.estado === 'error'
-  const aviso = error ? <>No cargó<br />Toca para reintentar</> : vacia ? 'Sin fotos' : img === 'rota' ? 'No se puede mostrar' : null
+  const n = d.usos.length
+  const u = d.ultimo
+  const cliente = d.clientes.length > 1 ? `${u.pedido.cliente} y otros` : (u.pedido.cliente || 'Sin cliente')
   return (
     <button
       ref={ref}
       type="button"
       className="dz-tarj"
-      data-id={d.id}
-      onClick={() => (error ? reintentar(d.id) : onAbrir())}
-      aria-label={`Diseño de ${d.pedido.cliente}, pedido ${d.pedido.numero}${f.n > 1 ? `, ${f.n} fotos` : ''}`}
+      data-id={d.key}
+      onClick={onAbrir}
+      aria-label={`Diseño de ${d.clientes.join(', ') || 'sin cliente'}, ${n > 1 ? `usado en ${n} pedidos` : `pedido ${u.pedido.numero}`}`}
     >
-      <span className={`dz-marco${img === 'lista' ? ' lista' : ''}${aviso ? ' error' : ''}`}>
-        {mini && <img src={mini} alt="" draggable={false} decoding="async" onLoad={() => setImg('lista')} onError={() => setImg('rota')} />}
-        {f.n > 1 && <span className="dz-n" aria-hidden="true">{IcoFotos}{f.n}</span>}
-        {aviso && <span className="dz-err">{aviso}</span>}
-      </span>
+      <MarcoDiseno d={d} visto={visto}>
+        {n > 1 && <span className="dz-n" aria-hidden="true">{IcoVarios}{n} pedidos</span>}
+      </MarcoDiseno>
       <span className="dz-pie">
-        <span className="dz-l1"><b>{d.pedido.cliente}</b><span className="dz-num">{d.pedido.numero}</span></span>
-        <span className="dz-l2"><i className={`dz-punto ${d.prenda}`} />{[d.tipos, d.ref].filter(Boolean).join(' · ')}</span>
+        <span className="dz-l1"><b>{cliente}</b><span className="dz-num">{u.pedido.numero}</span></span>
+        <span className="dz-l2"><i className={`dz-punto ${u.prenda}`} />{[d.tipos, d.ref].filter(Boolean).join(' · ')}</span>
       </span>
     </button>
   )
 }
 
-const IcoFotos = (
+const IcoVarios = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
     <rect x="7" y="7" width="14" height="14" rx="2.5" />
     <path d="M3 16V5a2 2 0 0 1 2-2h11" />
