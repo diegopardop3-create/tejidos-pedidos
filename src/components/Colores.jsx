@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { Ico } from './iconos'
 import VistaFormulas from './VistaFormulas'
 import VistaHilos from './VistaHilos'
 import { lineasDe } from './hilos'
+import { cambiarConTransicion, useIndicador } from './Movimiento'
 
 // ============================================
 // COLORES
@@ -30,11 +31,17 @@ export default function Colores({ pedidos, showToast, onAbrirPedido }) {
   const [selFormula, setSelFormula] = useState(null)
   const [selHilo, setSelHilo] = useState(null)
   const [nuevo, setNuevo] = useState(false)
+  const segRef = useIndicador(vista)
+  const zonaRef = useRef(null)
 
-  function setVista(v) {
-    setVistaEstado(v)
-    setNuevo(false)
+  // Fórmulas ↔ Hilos con la misma animación que las pestañas de arriba.
+  // "despues" se aplica junto con el cambio (ej. abrir la ficha de un hilo),
+  // y "subir" vuelve al principio para ver esa ficha.
+  function setVista(v, { despues, subir = false } = {}) {
     try { localStorage.setItem(VISTA_KEY, v) } catch { /* sin almacenamiento: no pasa nada */ }
+    const cambio = () => { setVistaEstado(v); setNuevo(false); despues?.() }
+    if (v === vista) { cambio(); if (subir) window.scrollTo({ top: 0, behavior: 'smooth' }); return }
+    cambiarConTransicion(cambio, { zona: zonaRef.current, dir: v === 'hilos' ? 1 : -1, subir })
   }
 
   useEffect(() => {
@@ -84,8 +91,8 @@ export default function Colores({ pedidos, showToast, onAbrirPedido }) {
     return m
   }, [formulas])
 
-  const verHilo = (id) => { setVista('hilos'); setSelHilo(id); window.scrollTo({ top: 0, behavior: 'smooth' }) }
-  const verFormula = (id) => { setVista('formulas'); setSelFormula(id); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+  const verHilo = (id) => setVista('hilos', { despues: () => setSelHilo(id), subir: true })
+  const verFormula = (id) => setVista('formulas', { despues: () => setSelFormula(id), subir: true })
 
   return (
     <div className="co">
@@ -95,14 +102,16 @@ export default function Colores({ pedidos, showToast, onAbrirPedido }) {
           <p>{vista === 'formulas' ? 'Cómo se saca cada color: hilos, paso por el guiahilo y cabos.' : 'La carta de hilos: marca, número, color y estado de cada cono.'}</p>
         </div>
         <div className="co-cab-acc">
-          <div className="lp-seg co-vistas" role="group" aria-label="Vista">
-            <button className={vista === 'formulas' ? 'on' : ''} onClick={() => setVista('formulas')}>Fórmulas <span>{formulas.length}</span></button>
-            <button className={vista === 'hilos' ? 'on' : ''} onClick={() => setVista('hilos')}>Hilos <span>{hilos.length}</span></button>
+          <div className="lp-seg co-vistas con-pildora" role="group" aria-label="Vista" ref={segRef}>
+            <span className="indicador seg-pildora" aria-hidden="true" />
+            <button className={vista === 'formulas' ? 'on' : ''} aria-pressed={vista === 'formulas'} onClick={() => setVista('formulas')}>Fórmulas <span>{formulas.length}</span></button>
+            <button className={vista === 'hilos' ? 'on' : ''} aria-pressed={vista === 'hilos'} onClick={() => setVista('hilos')}>Hilos <span>{hilos.length}</span></button>
           </div>
           <button className="btn btn-p pr-nuevo" onClick={() => setNuevo(!nuevo)}>{Ico.mas}{vista === 'formulas' ? 'Nueva fórmula' : 'Nuevo hilo'}</button>
         </div>
       </div>
 
+      <div ref={zonaRef}>
       {vista === 'formulas' ? (
         <VistaFormulas
           formulas={formulas} setFormulas={setFormulas}
@@ -123,6 +132,7 @@ export default function Colores({ pedidos, showToast, onAbrirPedido }) {
           cargando={cargando} showToast={showToast}
         />
       )}
+      </div>
     </div>
   )
 }

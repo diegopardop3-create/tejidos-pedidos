@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useLayoutEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 import NuevoPedido from './NuevoPedido'
 import ListaPedidos from './ListaPedidos'
@@ -8,11 +8,43 @@ import ListaPrecios from './ListaPrecios'
 import Colores from './Colores'
 import DetalleModal from './DetalleModal'
 import ConfirmarEliminar from './ConfirmarEliminar'
+import { cambiarConTransicion, useIndicador } from './Movimiento'
 import logo from '../assets/logo.png'
 import './styles.css'
 
+// Orden de las pestañas, de izquierda a derecha: decide hacia qué lado se
+// desliza el contenido al cambiar.
+const ORDEN_PESTANAS = ['nuevo', 'lista', 'entregados', 'resumen', 'precios', 'colores']
+
 export default function Pedidos({ session }) {
   const [tab, setTab] = useState('nuevo')
+  // La pestaña pedida más reciente (se adelanta al estado mientras corre la
+  // animación, para que tocar varias seguidas calcule bien el lado).
+  const tabRef = useRef('nuevo')
+  const wrapRef = useRef(null)
+  const navRef = useRef(null)
+  const pistaRef = useIndicador(tab)
+
+  const irA = useCallback((id) => {
+    const desde = tabRef.current
+    if (id === desde) return
+    tabRef.current = id
+    cambiarConTransicion(() => setTab(id), {
+      zona: wrapRef.current,
+      dir: ORDEN_PESTANAS.indexOf(id) > ORDEN_PESTANAS.indexOf(desde) ? 1 : -1,
+      subir: true,
+    })
+  }, [])
+
+  // En el celular las pestañas no caben: la elegida se centra sola.
+  useLayoutEffect(() => {
+    const nav = navRef.current
+    const act = nav?.querySelector('button.on')
+    if (!nav || !act || nav.scrollWidth <= nav.clientWidth) return
+    const izq = Math.max(0, act.offsetLeft - (nav.clientWidth - act.offsetWidth) / 2)
+    const suave = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    nav.scrollTo({ left: izq, behavior: suave ? 'smooth' : 'auto' })
+  }, [tab])
   const [pedidos, setPedidos] = useState([])
   const [loading, setLoading] = useState(true)
   const [detalleIdx, setDetalleIdx] = useState(null)
@@ -176,15 +208,19 @@ export default function Pedidos({ session }) {
               <button className="logout-btn" onClick={handleLogout}>Salir</button>
             </div>
           </div>
-          <nav className="hnav" aria-label="Secciones">
-            {PESTANAS.map(([id, txt]) => (
-              <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)}>{txt}</button>
-            ))}
+          <nav className="hnav" aria-label="Secciones" ref={navRef}>
+            <div className="hnav-pista" ref={pistaRef}>
+              {PESTANAS.map(([id, txt]) => (
+                <button key={id} className={tab === id ? 'on' : ''} aria-current={tab === id ? 'page' : undefined} onClick={() => irA(id)}>{txt}</button>
+              ))}
+              {/* La rayita verde: un hilo que se desliza a la pestaña elegida. */}
+              <span className="indicador hnav-hilo" aria-hidden="true" />
+            </div>
           </nav>
         </div>
       </header>
 
-      <div className="wrap">
+      <div className="wrap" ref={wrapRef}>
         {/* Se mantiene SIEMPRE montado (solo se esconde con display:none) en
             vez de crearlo y destruirlo con cada cambio de pestaña. Antes,
             cambiar a Activos u otra pestaña mientras se armaba un pedido
@@ -197,7 +233,7 @@ export default function Pedidos({ session }) {
             onSaved={() => {
               setEditPedido(null)
               cargarPedidos()
-              setTab('lista')
+              irA('lista')
               showToast('✅', 'Pedido guardado correctamente')
             }}
             onCancelEdit={() => setEditPedido(null)}
@@ -271,7 +307,7 @@ export default function Pedidos({ session }) {
             if (!ok) { showToast('⚠️', 'No se pudieron cargar las fotos; intenta de nuevo'); return }
             setEditPedido(pedidosRef.current.find((p) => p.id === id))
             setDetalleIdx(null)
-            setTab('nuevo')
+            irA('nuevo')
           }}
           showToast={showToast}
         />

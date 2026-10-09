@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 
 // ============================================
 // MOVIMIENTO
@@ -8,6 +9,147 @@ import { useEffect, useRef, useState } from 'react'
 
 const sinMovimiento = () =>
   typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+// ============================================
+// CAMBIO DE PESTAÑA
+// ============================================
+// Lo que había se corre un poco hacia un lado y se apaga, y lo nuevo entra
+// desde el lado hacia donde vas (pestaña a la derecha → entra por la
+// derecha) y frena suave hasta su sitio. Todo en menos de medio segundo.
+//
+// Para animar lo que SE VA hace falta una foto de cómo estaba: eso lo da la
+// "transición de vista" del navegador. Mientras esa foto está en pantalla el
+// navegador no deja tocar nada, así que solo dura lo que tarda en apagarse
+// (0,11 s). Lo que LLEGA es la página de verdad animándose, así que se puede
+// tocar y usar desde el primer instante.
+//
+// En navegadores sin transiciones de vista, lo viejo desaparece de una y solo
+// se ve entrar lo nuevo. La barra de arriba siempre se queda quieta encima,
+// para que lo que sale nunca la tape.
+let transicionActual = 0
+let nombrados = []
+function soltarNombres() {
+  for (const el of nombrados) el.style.viewTransitionName = ''
+  nombrados = []
+}
+function nombrar(el, nombre) {
+  if (!el) return
+  el.style.viewTransitionName = nombre
+  if (!nombrados.includes(el)) nombrados.push(el)
+}
+
+// Entrada de lo nuevo. "retraso": espera a que lo viejo casi se apague; en
+// ese rato lo nuevo queda invisible (fill: backwards) para que no se asome.
+const entradas = new WeakMap()
+function animarEntrada(zona, dir, retraso) {
+  if (typeof zona.animate !== 'function') return
+  for (const a of entradas.get(zona) || []) a.cancel()
+  const base = { delay: retraso, fill: 'backwards' }
+  entradas.set(zona, [
+    zona.animate({ opacity: [0, 1] }, { ...base, duration: 220, easing: 'cubic-bezier(0, 0, .2, 1)' }),
+    zona.animate({ transform: [`translateX(${dir > 0 ? 40 : -40}px)`, 'none'] }, { ...base, duration: 360, easing: 'cubic-bezier(.16, 1, .3, 1)' }),
+  ])
+}
+
+// cambio: función que cambia el estado (ej. () => setTab('lista')).
+// zona: el elemento cuyo contenido cambia (es lo que se anima).
+// dir: 1 si se va hacia la derecha, -1 si hacia la izquierda.
+// subir: volver al principio de la página al cambiar.
+export function cambiarConTransicion(cambio, { zona, dir = 1, subir = false } = {}) {
+  const aplicar = () => {
+    flushSync(cambio)
+    if (subir && window.scrollY > 0) window.scrollTo(0, 0)
+  }
+  if (!zona || sinMovimiento()) { aplicar(); return }
+
+  if (typeof document.startViewTransition !== 'function') {
+    aplicar()
+    animarEntrada(zona, dir, 0)
+    return
+  }
+
+  const id = ++transicionActual
+  const raiz = document.documentElement
+  soltarNombres()
+  raiz.dataset.pestana = dir > 0 ? 'der' : 'izq'
+  nombrar(zona, 'pestana-sale')
+  nombrar(document.querySelector('.hdr'), 'pestana-cabecera')
+
+  let vt
+  try {
+    vt = document.startViewTransition(() => {
+      aplicar()
+      if (id !== transicionActual) return
+      // Lo nuevo ya no va en la foto: es la página real, que entra sola.
+      zona.style.viewTransitionName = ''
+      animarEntrada(zona, dir, 90)
+    })
+  } catch {
+    soltarNombres()
+    delete raiz.dataset.pestana
+    aplicar()
+    animarEntrada(zona, dir, 0)
+    return
+  }
+  const fin = () => {
+    if (id !== transicionActual) return
+    soltarNombres()
+    delete raiz.dataset.pestana
+  }
+  vt.ready.catch(() => {})
+  vt.updateCallbackDone.catch(() => {})
+  vt.finished.then(fin, fin)
+}
+
+// Indicador que se desliza hasta la opción activa (la rayita verde de las
+// pestañas, la pastilla blanca de "Lista | Tablero"). Se estira como un hilo
+// que se jala: el borde de adelante sale primero y el de atrás lo alcanza.
+//
+// Devuelve una ref para el contenedor. Dentro van los botones (el activo con
+// la clase "on") y un elemento con la clase "indicador".
+export function useIndicador(clave) {
+  const ref = useRef(null)
+  const primera = useRef(true)
+
+  useLayoutEffect(() => {
+    if (!ref.current) return
+    colocarIndicador(ref.current, !primera.current)
+    primera.current = false
+  }, [clave])
+
+  // Si cambia el tamaño (cargan las letras, aparece un número, se gira el
+  // celular), se acomoda sin animación.
+  useEffect(() => {
+    const cont = ref.current
+    if (!cont || typeof ResizeObserver === 'undefined') return undefined
+    const ro = new ResizeObserver(() => colocarIndicador(cont, false))
+    ro.observe(cont)
+    // El indicador mismo no: su ancho cambia mientras se desliza.
+    for (const hijo of cont.children) if (!hijo.classList.contains('indicador')) ro.observe(hijo)
+    return () => ro.disconnect()
+  }, [])
+
+  return ref
+}
+
+function colocarIndicador(cont, animar) {
+  const ind = cont.querySelector(':scope > .indicador')
+  if (!ind) return
+  const act = cont.querySelector(':scope > .on')
+  if (!act) { ind.style.opacity = '0'; return }
+  const l = act.offsetLeft
+  const r = cont.clientWidth - (act.offsetLeft + act.offsetWidth)
+  const lPrev = parseFloat(ind.style.getPropertyValue('--l'))
+  if (animar && !Number.isNaN(lPrev) && l !== lPrev) ind.dataset.dir = l > lPrev ? 'der' : 'izq'
+  if (!animar) ind.classList.add('quieto')
+  ind.style.setProperty('--l', `${l}px`)
+  ind.style.setProperty('--r', `${r}px`)
+  ind.style.opacity = ''
+  if (!animar) {
+    void ind.offsetWidth // aplica la posición ya, sin transición
+    ind.classList.remove('quieto')
+  }
+}
 
 // Un número que sube hasta su valor. Si el valor cambia (otro mes, un pedido
 // nuevo), sigue desde donde estaba hasta el valor nuevo.

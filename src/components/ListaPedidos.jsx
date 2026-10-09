@@ -1,10 +1,10 @@
-import { useState, Fragment } from 'react'
+import { useRef, useState, Fragment } from 'react'
 import { supabase } from '../supabaseClient'
 import { TIPO_LABEL, TIPO_ICON, fmtCOP, calcProgreso, totalesPorTipoCam, ESTADOS, ESTADO_ICON, ESTADO_DOT, PAGO_COLOR, PAGO_ICON } from './constants'
 import { imprimirEtiqueta } from './factura'
 import PanelPagos from './PanelPagos'
 import { InsigniaTipos } from './Insignias'
-import { ConoHilo } from './Movimiento'
+import { ConoHilo, cambiarConTransicion, useIndicador } from './Movimiento'
 
 // Iconos simples para los botones de cada fila (heredan el color del botón).
 const Ico = {
@@ -120,6 +120,14 @@ export default function ListaPedidos({ pedidos, loading, onVerDetalle, onElimina
   const [filEstado, setFilEstado] = useState('')
   const [modo, setModo] = useState('lista') // 'lista' | 'tablero' (solo en Activos)
   const [abiertoPago, setAbiertoPago] = useState(null) // id del pedido con panel pago abierto
+  const segRef = useIndicador(modo)
+  const zonaRef = useRef(null)
+
+  // Lista ↔ Tablero con la misma animación que las pestañas de arriba.
+  function cambiarModo(m) {
+    if (m === modo) return
+    cambiarConTransicion(() => setModo(m), { zona: zonaRef.current, dir: m === 'tablero' ? 1 : -1 })
+  }
 
   const coincide = (p) => (p.cliente + ' ' + p.numero).toLowerCase().includes(busqueda.toLowerCase())
   // En Activos se muestra primero lo más viejo (lo que lleva más tiempo en el
@@ -231,13 +239,15 @@ export default function ListaPedidos({ pedidos, loading, onVerDetalle, onElimina
           <p>{soloEntregados ? 'El historial de lo que ya salió del taller.' : 'Lo que está en el taller, de lo más viejo a lo más nuevo.'}</p>
         </div>
         {!soloEntregados && (
-          <div className="lp-seg" role="group" aria-label="Forma de ver">
-            <button className={modo === 'lista' ? 'on' : ''} onClick={() => setModo('lista')}>Lista</button>
-            <button className={modo === 'tablero' ? 'on' : ''} onClick={() => setModo('tablero')}>Tablero</button>
+          <div className="lp-seg con-pildora" role="group" aria-label="Forma de ver" ref={segRef}>
+            <span className="indicador seg-pildora" aria-hidden="true" />
+            <button className={modo === 'lista' ? 'on' : ''} aria-pressed={modo === 'lista'} onClick={() => cambiarModo('lista')}>Lista</button>
+            <button className={modo === 'tablero' ? 'on' : ''} aria-pressed={modo === 'tablero'} onClick={() => cambiarModo('tablero')}>Tablero</button>
           </div>
         )}
       </div>
 
+      <div ref={zonaRef}>
       {!soloEntregados && modo === 'lista' && (
         <div className="lp-etapas">
           <button className={`lp-etapa ${!filEstado ? 'on' : ''}`} onClick={() => setFilEstado('')}>
@@ -347,6 +357,7 @@ export default function ListaPedidos({ pedidos, loading, onVerDetalle, onElimina
           </table>
         </div>
       )}
+      </div>
     </div>
   )
 }

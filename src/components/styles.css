@@ -44,13 +44,49 @@ body { font-family: 'Inter', sans-serif; background: var(--loom); color: var(--i
 @keyframes recargar-giro { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @media (max-width: 560px) { .recargar-txt { display: none; } .recargar-btn { padding: 6px 8px; } }
 @media (prefers-reduced-motion: reduce) { .recargar-btn svg, .recargar-btn.girando svg { transition: none; animation: none; } }
-.hnav { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+.hnav { overflow-x: auto; scrollbar-width: none; }
 .hnav::-webkit-scrollbar { display: none; }
-.hnav button { background: none; border: 0; color: rgba(255,255,255,.66); padding: 10px 14px 12px; font-weight: 600; font-size: 13px; white-space: nowrap; border-bottom: 3px solid transparent; display: flex; align-items: center; gap: 7px; cursor: pointer; font-family: 'Inter', sans-serif; transition: color .15s; }
+.hnav-pista { position: relative; display: flex; gap: 2px; width: max-content; min-width: 100%; }
+.hnav button { background: none; border: 0; color: rgba(255,255,255,.66); padding: 10px 14px 12px; font-weight: 600; font-size: 13px; white-space: nowrap; border-bottom: 3px solid transparent; display: flex; align-items: center; gap: 7px; cursor: pointer; font-family: 'Inter', sans-serif; transition: color .2s ease, transform .12s ease; -webkit-tap-highlight-color: transparent; }
 .hnav button:hover { color: #fff; }
-.hnav button.on { color: #fff; border-bottom-color: var(--thread); }
+.hnav button:active { transform: scale(.96); }
+.hnav button.on { color: #fff; }
+.hnav button:focus-visible { outline: 2px solid var(--yarn); outline-offset: -4px; border-radius: 6px; }
 .hnav-n { font-family: 'DM Mono', monospace; font-size: 10.5px; background: rgba(255,255,255,.14); padding: 1px 6px; border-radius: 5px; }
 .hnav-mas { font-size: 16px; line-height: 1; }
+
+/* ============ CAMBIO DE PESTAÑA ============
+   1) Indicador que se desliza a la opción elegida y se estira como un hilo
+      que se jala: el borde de adelante sale primero y el de atrás lo alcanza
+      un instante después. --l y --r los pone Movimiento.jsx (useIndicador).
+   2) El contenido: lo que había se corre y se desvanece hacia un lado; lo
+      nuevo entra desde el lado hacia donde vas (Movimiento.jsx,
+      cambiarConTransicion). Todo en menos de medio segundo. */
+.indicador {
+  --curva: cubic-bezier(.2, 0, 0, 1);
+  position: absolute; left: var(--l, 0); right: var(--r, 100%);
+  pointer-events: none;
+  transition: left .34s var(--curva) var(--retraso-izq, 0s), right .34s var(--curva) var(--retraso-der, 0s);
+}
+.indicador[data-dir="der"] { --retraso-izq: .08s; }
+.indicador[data-dir="izq"] { --retraso-der: .08s; }
+.indicador.quieto { transition: none; }
+.hnav-hilo { bottom: 0; height: 3px; border-radius: 3px 3px 0 0; background: var(--thread); box-shadow: 0 0 10px rgba(124, 186, 74, .35); }
+
+/* Durante la foto (0,11 s) la página real se ve tal cual por debajo; solo
+   la foto de lo que se va se mueve: acelera hacia afuera mientras se apaga.
+   Lo que llega lo anima Movimiento.jsx sobre la página real. */
+::view-transition-group(root), ::view-transition-group(pestana-cabecera), ::view-transition-group(aviso) { animation: none; }
+::view-transition-old(root), ::view-transition-old(pestana-cabecera) { animation: none; opacity: 0; }
+::view-transition-new(root), ::view-transition-new(pestana-cabecera) { animation: none; }
+::view-transition-old(aviso), ::view-transition-new(aviso) { animation-duration: .11s; }
+::view-transition-old(pestana-sale) { animation: 110ms cubic-bezier(.4, 0, 1, 1) both pt-se-va, 110ms cubic-bezier(.3, 0, .8, .15) both pt-a-izq; }
+html[data-pestana="izq"]::view-transition-old(pestana-sale) { animation-name: pt-se-va, pt-a-der; }
+@keyframes pt-se-va { to { opacity: 0; } }
+@keyframes pt-a-izq { to { transform: translateX(-28px); } }
+@keyframes pt-a-der { to { transform: translateX(28px); } }
+/* El aviso de abajo se queda encima mientras cambia la pestaña */
+.toast { view-transition-name: aviso; }
 @media (max-width: 560px) { .huser-mail { display: none; } .hmarca { font-size: 16px; } }
 
 .wrap { max-width: 1160px; margin: 0 auto; padding: 20px 14px; }
@@ -383,6 +419,11 @@ tbody td { padding: 10px 13px; vertical-align: middle; }
 .lp-seg { display: inline-flex; background: #f1eee2; border: 1px solid var(--border); border-radius: 8px; padding: 3px; gap: 2px; }
 .lp-seg button { border: 0; background: none; padding: 6px 14px; border-radius: 6px; font-size: 12.5px; font-weight: 600; color: var(--muted); cursor: pointer; font-family: 'Inter', sans-serif; }
 .lp-seg button.on { background: var(--white); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+/* Con pastilla deslizante: el fondo blanco lo pone la pastilla, no el botón */
+.lp-seg.con-pildora { position: relative; }
+.lp-seg.con-pildora button { position: relative; z-index: 1; transition: color .2s ease; }
+.lp-seg.con-pildora button.on { background: none; box-shadow: none; }
+.seg-pildora { top: 3px; bottom: 3px; border-radius: 6px; background: var(--white); box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 0 0 1px rgba(0,0,0,.02); }
 .lp-etapas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
 .lp-etapa { border: 1px solid var(--border); background: var(--white); border-radius: 10px; padding: 11px 14px; text-align: left; display: flex; flex-direction: column; gap: 3px; cursor: pointer; font-family: 'Inter', sans-serif; color: var(--ink); }
 .lp-etapa .n { font-family: 'DM Mono', monospace; font-size: 22px; font-weight: 500; }
@@ -944,6 +985,8 @@ table.tt tfoot td { font-family: 'DM Mono', monospace; font-weight: 500; color: 
   /* Fondos claros fijos -> sus versiones oscuras */
   .app-root .lp-seg, .app-root .lp-col { background: #141c22; }
   .app-root .lp-seg button.on { background: #26323b; }
+  .app-root .lp-seg.con-pildora button.on { background: none; }
+  .app-root .seg-pildora { background: #26323b; box-shadow: none; }
   .app-root .lp-avance .prog-wrap, .app-root .rs-flujo, .app-root .rs-barra, .app-root .prog-wrap { background: #26323b; }
   .app-root .lp-pago.ok, .app-root .rs-tag.ok, .app-root .co-tag.ok, .app-root .sb-cam, .app-root .tchip.parte, .app-root .tsel .unida { background: #24361f; }
   .app-root .lp-pago.parcial, .app-root .co-tag.aviso, .app-root .sb-chaq { background: #3a3020; }
