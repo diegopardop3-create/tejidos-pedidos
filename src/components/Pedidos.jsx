@@ -11,6 +11,7 @@ import DetalleModal from './DetalleModal'
 import ConfirmarEliminar from './ConfirmarEliminar'
 import { cambiarConTransicion, useIndicador } from './Movimiento'
 import { olvidarFotos } from './fotosDisenos'
+import { useVersionNueva } from './version'
 import logo from '../assets/logo.png'
 import './styles.css'
 
@@ -160,6 +161,10 @@ export default function Pedidos({ session }) {
     u.searchParams.set('intro', '')
     window.setTimeout(() => window.location.assign(u.toString()), 350)
   }
+
+  // Aviso cuando se publicó una versión nueva mientras la app estaba abierta.
+  const versionNueva = useVersionNueva()
+  const [avisoVersion, setAvisoVersion] = useState(true)
 
   async function handleLogout() {
     // Las fotos que la galería guardó en este dispositivo no se quedan.
@@ -338,6 +343,14 @@ export default function Pedidos({ session }) {
           }}
           showToast={showToast}
         />
+      )}
+
+      {versionNueva && avisoVersion && (
+        <div className="aviso-version" role="status">
+          <span>Hay una versión nueva de la app.</span>
+          <button className="btn btn-p btn-sm" onClick={recargar} disabled={recargando}>Actualizar</button>
+          <button className="aviso-version-x" onClick={() => setAvisoVersion(false)} aria-label="Ahora no">✕</button>
+        </div>
       )}
 
       {toast && (

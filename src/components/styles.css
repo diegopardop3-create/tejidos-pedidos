@@ -1247,3 +1247,11 @@ button.ed-foto-add { background: var(--white); padding: 0; font-family: 'Inter',
   .app-root .el-panel { box-shadow: 0 20px 60px rgba(0,0,0,.5); }
   .app-root .el-marca { box-shadow: 0 0 0 2px #192128; }
 }
+
+/* Aviso de versión nueva de la app */
+.aviso-version { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 260; display: flex; align-items: center; gap: 10px; width: max-content; max-width: calc(100vw - 24px); padding: 10px 10px 10px 16px; border-radius: 12px; background: var(--ink); color: #fff; font-size: 13px; font-weight: 500; box-shadow: 0 10px 30px rgba(0,0,0,.25); animation: aviso-sube .35s cubic-bezier(.2,0,0,1) backwards; }
+.aviso-version .btn-p { white-space: nowrap; }
+.aviso-version-x { border: 0; background: none; color: rgba(255,255,255,.7); font-size: 15px; cursor: pointer; padding: 4px 6px; }
+.aviso-version-x:hover { color: #fff; }
+@keyframes aviso-sube { from { opacity: 0; transform: translate(-50%, 16px); } }
+@media (prefers-color-scheme: dark) { .app-root .aviso-version { background: var(--bar); border: 1px solid #2c3943; } }
