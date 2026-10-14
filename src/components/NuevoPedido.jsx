@@ -5,6 +5,7 @@ import ColorSwatch from './ColorSwatch'
 import FormulaColorBoton from './FormulaColorBoton'
 import { InsigniaTipos, InsigniaJuego, IconoPrenda } from './Insignias'
 import ElegirDiseno from './ElegirDiseno'
+import ClientesAdmin from './ClientesAdmin'
 
 // Reduce una foto (archivo) a máx. 1200 px y la devuelve como texto base64
 // JPEG. Si algo falla (formato raro), devuelve la foto original sin tocar.
@@ -121,7 +122,8 @@ function normalizarNumero(t) {
   return n > 0 ? 'P-' + String(n).padStart(4, '0') : ''
 }
 
-export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit, showToast, userId }) {
+export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit, showToast, userId, refrescar }) {
+  const [adminClientes, setAdminClientes] = useState(false)
   const [cliente, setCliente] = useState('')
   const [fecha, setFecha] = useState(hoy())
   const [estado, setEstado] = useState('Pendiente')
@@ -651,7 +653,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
       <div className="g5" style={{ marginBottom: 20 }}>
         <div className="fld"><label>N° Pedido</label><input className={editPedido ? '' : 'rinp'} readOnly={!editPedido} value={numPedido} onChange={(e) => setNumPedido(e.target.value)} onBlur={() => editPedido && setNumPedido(normalizarNumero(numPedido))} /></div>
         <div className="fld" ref={cajaClienteRef} style={{ position: 'relative' }}>
-          <label>Cliente *</label>
+          <label>Cliente * <button type="button" className="ca-enlace" onClick={() => setAdminClientes(true)}>Administrar clientes</button></label>
           <input
             value={cliente}
             onChange={(e) => { setCliente(e.target.value); setSugerenciasAbiertas(true) }}
@@ -659,6 +661,20 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
             placeholder="Nombre del cliente"
             autoComplete="off"
           />
+          {adminClientes && (
+            <ClientesAdmin
+              pedidos={pedidos}
+              showToast={showToast}
+              onCerrar={() => setAdminClientes(false)}
+              onRenombrado={(viejo, nuevoNombre) => {
+                if (cliente === viejo) setCliente(nuevoNombre)
+                refrescar?.()
+              }}
+            />
+          )}
+          {sugerenciasAbiertas && cliente.trim() && !clientesExistentes.includes(cliente.trim()) && (
+            <div style={{ fontSize: 11.5, color: 'var(--muted, #888)', marginTop: 4 }}>➕ Cliente nuevo: se guardará con este pedido.</div>
+          )}
           {sugerenciasAbiertas && sugerenciasCliente.length > 0 && (
             <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 30, background: 'var(--white)', border: '1px solid var(--border)', borderRadius: 8, marginTop: 4, maxHeight: 200, overflowY: 'auto', boxShadow: '0 6px 20px rgba(0,0,0,.15)' }}>
               {sugerenciasCliente.map((c) => (

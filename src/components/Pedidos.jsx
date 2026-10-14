@@ -248,6 +248,7 @@ export default function Pedidos({ session }) {
             }}
             onCancelEdit={() => setEditPedido(null)}
             showToast={showToast}
+            refrescar={cargarPedidos}
             userId={session.user.id}
           />
         </div>
