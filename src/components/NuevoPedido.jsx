@@ -115,6 +115,12 @@ const leerFotosBorrador = () =>
 const fotosDeItems = (items) => (items || []).map((it) => it.imagenes || [])
 const hayFotos = (f) => !!f && [...(f.cam || []), ...(f.chaq || [])].some((a) => a && a.length)
 
+// "p-23", "23" o "P-0023" -> "P-0023"; vacío si no trae número.
+function normalizarNumero(t) {
+  const n = parseInt(String(t || '').replace(/\D/g, ''), 10)
+  return n > 0 ? 'P-' + String(n).padStart(4, '0') : ''
+}
+
 export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit, showToast, userId }) {
   const [cliente, setCliente] = useState('')
   const [fecha, setFecha] = useState(hoy())
@@ -548,6 +554,14 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
     if (!fecha) { showToast('⚠️', 'Selecciona la fecha'); return }
     if (!tempCam.length && !tempChaq.length) { showToast('⚠️', 'Añade al menos un ítem'); return }
 
+    let numero = numPedido
+    if (editPedido) {
+      numero = normalizarNumero(numPedido)
+      if (!numero) { showToast('⚠️', 'El número del pedido debe ser como P-0023'); return }
+      const repetido = pedidos.find((p) => p.id !== editPedido.id && (p.numero || '').toUpperCase() === numero)
+      if (repetido) { showToast('⚠️', `Ya existe un pedido ${numero} (${repetido.cliente})`); return }
+    }
+
     setSaving(true)
     const totCam = tempCam.reduce((s, it) => s + it.total_precio, 0)
     const hayChaq = tempChaq.length > 0
@@ -557,7 +571,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
       if (editPedido) {
         pedidoId = editPedido.id
         const { error } = await supabase.from('pedidos').update({
-          cliente: cliente.trim(), fecha, estado, observaciones: obs.trim(),
+          numero, cliente: cliente.trim(), fecha, estado, observaciones: obs.trim(),
           total_camiseta: totCam, hay_chaqueta: hayChaq,
           total_final: hayChaq ? null : totCam,
           actualizado_en: new Date().toISOString(),
@@ -635,7 +649,7 @@ export default function NuevoPedido({ pedidos, editPedido, onSaved, onCancelEdit
       )}
 
       <div className="g5" style={{ marginBottom: 20 }}>
-        <div className="fld"><label>N° Pedido</label><input className="rinp" readOnly value={numPedido} /></div>
+        <div className="fld"><label>N° Pedido</label><input className={editPedido ? '' : 'rinp'} readOnly={!editPedido} value={numPedido} onChange={(e) => setNumPedido(e.target.value)} onBlur={() => editPedido && setNumPedido(normalizarNumero(numPedido))} /></div>
         <div className="fld" ref={cajaClienteRef} style={{ position: 'relative' }}>
           <label>Cliente *</label>
           <input
